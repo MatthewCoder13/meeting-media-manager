@@ -111,7 +111,7 @@ export const fetchRaw = async (
   cache = false,
 ) => {
   // Demo mode must never reach the network (no real congregation, no real
-  // JW.org content) — fail the same way a real offline device would, so the
+  // website content) — fail the same way a real offline device would, so the
   // app's existing offline handling takes over rather than needing bespoke
   // handling at every call site.
   if (globalThis.electronApi?.isDemoMode) {
@@ -159,7 +159,9 @@ function isIgnored400ForPub(params?: URLSearchParams) {
 }
 
 function isIgnoredStatus(status: number) {
-  return [403, 404, 429, 502].includes(status);
+  // 502/504 are both transient upstream-gateway failures (Bad Gateway /
+  // Gateway Timeout) - same class of noise, 504 was just missing here.
+  return [403, 404, 429, 502, 504].includes(status);
 }
 
 function isOkResponse(response: Response) {
