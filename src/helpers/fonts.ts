@@ -7,6 +7,7 @@ import {
   keywordToJwIconMapping,
 } from 'src/constants/jw-icons';
 import { errorCatcher } from 'src/helpers/error-catcher';
+import { getFilesystemErrorCode } from 'src/shared/filesystem-errors';
 import { fetchRaw } from 'src/utils/api';
 import { getFontsPath } from 'src/utils/fs';
 import { useJwStore } from 'stores/jw';
@@ -282,37 +283,59 @@ const getExistingLocalFontPath = async (
   return null;
 };
 
+const parseJwIconsGlyphMap = (buffer: Buffer) => {
+  const font = create(buffer) as Font;
+  const characterSet = font.characterSet; // id: dec code point
+  const map: Record<string, string> = {};
+  let unusedGlyphs = 0;
+  for (let i = 0; i < font.numGlyphs; i++) {
+    const glyph = font.getGlyph(i);
+    if (['.notdef', '.null', 'nonmarkingreturn'].includes(glyph.name)) {
+      unusedGlyphs++;
+      continue;
+    }
+    const codePoint = characterSet[glyph.id - unusedGlyphs];
+    if (glyph.name && codePoint) {
+      map[glyph.name] = String.fromCodePoint(codePoint);
+    }
+  }
+  return map;
+};
+
 const buildJwIconsMap = async (fontPath: string) => {
   if (jwIconsGlyphMap) return;
   if (jwIconsGlyphMapPromise) return jwIconsGlyphMapPromise;
 
   jwIconsGlyphMapPromise = (async () => {
     try {
-      const buffer = await readFile(fontPath);
-      const font = create(buffer) as Font;
-      const characterSet = font.characterSet; // id: dec code point
-      const map: Record<string, string> = {};
-      let unusedGlyphs = 0;
-      for (let i = 0; i < font.numGlyphs; i++) {
-        const glyph = font.getGlyph(i);
-        if (['.notdef', '.null', 'nonmarkingreturn'].includes(glyph.name)) {
-          unusedGlyphs++;
-          continue;
-        }
-        const codePoint = characterSet[glyph.id - unusedGlyphs];
-        if (glyph.name && codePoint) {
-          map[glyph.name] = String.fromCodePoint(codePoint);
+      jwIconsGlyphMap = parseJwIconsGlyphMap(await readFile(fontPath));
+    } catch (error) {
+      // The font file can vanish between setElementFont() confirming/
+      // downloading it and this read (seen in Sentry as MMM-V2-3EH, likely
+      // AV quarantine on Windows) - redownload once to get an accurate,
+      // up-to-date glyph map instead of dropping straight to the static
+      // fallback.
+      let recovered = false;
+      let reportedError = error;
+      if (getFilesystemErrorCode(error) === 'ENOENT') {
+        try {
+          delete localFontPathPromises['jw-icons-all'];
+          const freshFontPath = await getLocalFontPath('jw-icons-all');
+          jwIconsGlyphMap = parseJwIconsGlyphMap(await readFile(freshFontPath));
+          recovered = true;
+        } catch (retryError) {
+          reportedError = retryError;
         }
       }
-      jwIconsGlyphMap = map;
-      jwIconsGlyphMapVersion.value++;
-    } catch (error) {
-      errorCatcher(error, {
-        contexts: { fn: { fontPath, name: 'buildJwIconsMap' } },
-      });
-      jwIconsGlyphMap = fallbackJwIconsGlyphMap;
-      jwIconsGlyphMapVersion.value++;
+
+      if (!recovered) {
+        errorCatcher(reportedError, {
+          contexts: { fn: { fontPath, name: 'buildJwIconsMap' } },
+        });
+        jwIconsGlyphMap = fallbackJwIconsGlyphMap;
+      }
     }
+    jwIconsGlyphMapVersion.value++;
   })();
   return jwIconsGlyphMapPromise;
 };
@@ -405,13 +428,22 @@ const resolveFontRequest = async (
     );
 
   let resolvedUrl = originalUrl;
-  // originalUrl can be empty for jw-icons-all (no static fallback — see
-  // jw.ts fontUrls getter), so skip straight to discovering it below
-  // instead of issuing a fetch with an empty URL.
+  // originalUrl can be empty for jw-icons-all and the two WT yeartext fonts
+  // below (no static fallback — see jw.ts fontUrls getter), so skip
+  // straight to discovering it below instead of issuing a fetch with an
+  // empty URL.
   let response = resolvedUrl ? await fetchFont(resolvedUrl) : undefined;
 
-  if (!response?.ok && fontName === 'jw-icons-all') {
-    await store.updateJwIconsUrl();
+  const isJwIcons = fontName === 'jw-icons-all';
+  const isDynamicYeartextFont =
+    fontName === 'Wt-BaeumMyungjo' || fontName === 'Wt-ClearText-Bold';
+
+  if (!response?.ok && (isJwIcons || isDynamicYeartextFont)) {
+    if (isJwIcons) {
+      await store.updateJwIconsUrl();
+    } else {
+      await store.updateYeartextFontUrls();
+    }
     const fallbackUrl = store.fontUrls[fontName];
     if (fallbackUrl && fallbackUrl !== originalUrl) {
       resolvedUrl = fallbackUrl;

@@ -215,6 +215,7 @@ import {
   resolveFilePath,
 } from 'src/helpers/jw-media';
 import { createTemporaryNotification } from 'src/helpers/notifications';
+import { getFilesystemErrorCode } from 'src/shared/filesystem-errors';
 import { log } from 'src/shared/vanilla';
 import { getTempPath } from 'src/utils/fs';
 import { isImage } from 'src/utils/media';
@@ -264,16 +265,33 @@ const includeNumbering = ref(true);
 const currentState = useCurrentStateStore();
 const { selectedDate, selectedDateObject } = storeToRefs(currentState);
 
-const { basename, executeQuery, extname, fs, join, pathToFileURL, unzip } =
-  globalThis.electronApi;
+const {
+  basename,
+  dirname,
+  executeQuery,
+  extname,
+  fs,
+  join,
+  pathToFileURL,
+  readdir,
+  unzip,
+} = globalThis.electronApi;
 const { pathExists, rename } = fs;
 
+// The jwPlaylistPath watcher and the dialog-open watcher below can both
+// fire for the same path change (path changes while the dialog opens),
+// which would otherwise run this whole extraction/processing pipeline
+// twice concurrently and race on the file renames further down.
+let loadingPlaylistPath: string | undefined;
+
 const loadPlaylistItems = async () => {
+  if (!props.jwPlaylistPath || loadingPlaylistPath === props.jwPlaylistPath) {
+    return;
+  }
+  loadingPlaylistPath = props.jwPlaylistPath;
   loading.value = true;
 
   try {
-    if (!props.jwPlaylistPath) return;
-
     // Extract package
     const tempDir = await getTempPath();
     const outputPath = join(tempDir, basename(props.jwPlaylistPath));
@@ -365,8 +383,32 @@ const loadPlaylistItems = async () => {
         await rename(absolutePath, newPath);
         return newPath;
       } catch (err) {
-        // File may not exist or rename failed — keep original path
-        errorCatcher(err);
+        // Playlist items are processed concurrently below and can share the
+        // same thumbnail/independent-media file. If another item already
+        // renamed it, the target now exists — that's a benign race, not an
+        // error. `rename` is exposed straight through Electron's
+        // contextBridge, so the thrown error's `code` doesn't survive the
+        // crossing — getFilesystemErrorCode falls back to parsing it back
+        // out of the message text.
+        if (
+          getFilesystemErrorCode(err) === 'ENOENT' &&
+          (await pathExists(newPath))
+        ) {
+          return newPath;
+        }
+        // The source is genuinely missing rather than just already renamed
+        // by a concurrent call — capture what's actually in the containing
+        // directory to tell apart "never extracted" from "renamed to
+        // something unexpected" next time this comes up in Sentry.
+        const dirListing = await readdir(dirname(absolutePath));
+        errorCatcher(err, {
+          contexts: {
+            fn: {
+              dirListing: dirListing.map((entry) => entry.name),
+              name: 'ensureJpgExtension rename',
+            },
+          },
+        });
         return absolutePath;
       }
     };
@@ -431,6 +473,7 @@ const loadPlaylistItems = async () => {
   } catch (err) {
     errorCatcher(err);
   } finally {
+    loadingPlaylistPath = undefined;
     loading.value = false;
   }
 };

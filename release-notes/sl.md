@@ -4,6 +4,19 @@
 
 Za celoten seznam sprememb med različicami si oglejte našo datoteko CHANGELOG.md na GitHubu.
 
+## v26.7.7
+
+### ✨ Nove funkcije
+
+- ✨ **Media Preview Quality**: Media preview now renders video frames via canvas with high-quality downscaling, fixing jagged/blurry previews (especially on text-heavy content like songs). The preview also auto-disables itself if it has to repeatedly correct playback drift on a single video, with a one-click way to turn it back on.
+
+## v26.7.6
+
+### ✨ Nove funkcije
+
+- ✨ **Izključitev videoposnetkov za OPB**: Dodana je nastavitev za izključitev videoposnetkov za Občinsko preučevanje Biblije iz določenih publikacij (privzeto iz knjige **Pogumno hodi z Bogom**). Na voljo je tudi iskalnik za izbiro publikacije po naslovu ali simbolu.
+- ✨ **Številke strani dokumentov**: Seznam multimedijske vsebine v publikacijah ter uvoz JWPUB datotek zdaj prikazujeta številko strani vsakega dokumenta (ali več številk, če je dokument na več straneh). To pomaga hitreje najti določeno multimedijsko datoteko, če veš, na kateri strani se nahaja.
+
 ## v26.7.4
 
 ### ✨ Nove funkcije

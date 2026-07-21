@@ -4,9 +4,22 @@
 
 Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGELOG.md su GitHub.
 
-## v26.7.4
+## v26.7.7
 
 ### ✨ Nuove Funzionalità
+
+- ✨ **Media Preview Quality**: Ora l'anteprima dei media rende i fotogrammi video tramite tela con downscaling di alta qualità, fissando anteprime jagged/blurry (soprattutto su contenuti testo-pesanti come le canzoni). L'anteprima si disattiva automaticamente anche se deve correggere ripetutamente la deriva di riproduzione su un singolo video, con un clic per riaccenderlo.
+
+## v26.7.6
+
+### ✨ Nuove Funzionalità
+
+- ✨ **Esclusione Video CBS**: Aggiunta un'impostazione per escludere i video di Studio Biblico di Congregazione da pubblicazioni specifiche (default per il **Camminare coraggiosamente con Dio** libro), con un selettore di pubblicazione ricercabile.
+- ✨ **Numeri di pagina del documento**: Pubblicazione Media e JWPUB importati ora mostra il numero di pagina di ogni documento (o i numeri quando ci sono più pagine) dopo il suo titolo. Questo può aiutare a trovare rapidamente i media specifici quando si conosce il numero di pagina su cui è trovato.
+
+## v26.7.4
+
+### ✨ Nuove funzionalità
 
 - ✨ **Recupero dei media mancanti**: gli elementi multimediali il cui file locale è andato perso (ad es. eliminato dalla cancellazione automatica della cache, o rimosso manualmente) mostrano ora un pulsante di riproduzione disabilitato, una didascalia «mancante» che indica il file da cercare e una nuova azione «Individua file» per ricollegare l'elemento a un file sul disco.
 - ✨ **Avviso di compatibilità**: aggiunto un banner ignorabile che avvisa gli utenti con combinazioni di sistema operativo/architettura presto non più supportate (macOS 12 Monterey e Windows a 32 bit) di aggiornare prima che i futuri aggiornamenti dell'app richiedano un sistema più recente.
@@ -55,7 +68,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v26.3.0
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - ✨ **Memorial Media**: Il recupero automatico dei media commemorativi è ora fuori dalla beta! L'app scaricherà automaticamente il Memorial Welcome Video e l'immagine da visualizzare durante il Memoriale, quando disponibile nella lingua configurata.
 - ✨ **Velocità di riproduzione**: Aggiunto controllo della velocità di riproduzione con indicatore visivo, e ripristino manuale. Questa funzione è visibile solo se abilitata nelle impostazioni avanzate.
@@ -63,13 +76,13 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v26.2.0
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - ✨ **Controllo spazio su disco**: Aggiunta funzionalità per monitorare e notificare quando lo spazio su disco è basso.
 
 ## v26.1.5
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - ✨ **Media Commemorazione**: Recupera automaticamente banner Commemorazione e video introduttivo nelle lingue supportate quando la data della Commemorazione è selezionata.
 
@@ -135,7 +148,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v25.9.1
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - ✨ **Finestra multimediale sempre in primo piano e comportamento a schermo intero**: corretto e migliorato il comportamento sempre-in-primo-piano della finestra multimediale, adattandolo dinamicamente in base allo stato a schermo intero.
 - ✨ **Impostazione del formato di visualizzazione della data**: aggiunta un'impostazione utente per configurare un formato di visualizzazione della data.
@@ -152,7 +165,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v25.8.3
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - ✨ **Transizioni in dissolvenza della finestra multimediale**: aggiunta una nuova impostazione avanzata per far comparire e scomparire in dissolvenza la finestra multimediale, offrendo transizioni visive più morbide.
 - ✨ **Controllo della durata delle immagini e monitoraggio dell'avanzamento**: aggiunte le funzioni di controllo della durata delle immagini e di monitoraggio dell'avanzamento per le sezioni ripetute.
@@ -174,7 +187,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## 25.6.0
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - ✨ **Impostazione di connessione a consumo**: Aggiunta una nuova impostazione per ridurre l'utilizzo della banda di download sulle connessioni a consumo.
 - ✨ **Migliorata la gestione dei media in streaming**: Migliore supporto per i media in streaming, riducendo i problemi legati alla latenza.
@@ -188,7 +201,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## 25.4.0
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - 🇵🇭 **Nuova lingua: tagalog**: aggiunto il supporto per il tagalog, ampliando le capacità multilingue dell'app.
 - 🎞 **Supporto per il formato video `.m4v`**: ora supporta la riproduzione dei file `.m4v` per migliorare la compatibilità dei media.
@@ -201,7 +214,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## 25.3.0
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - 🎵 **Riproduci la musica di sottofondo con i video**: consente alla musica di sottofondo di continuare a suonare mentre si guardano i video.
 - 🎥 **Feed della videocamera per i media nella lingua dei segni**: aggiunge la possibilità di mostrare un feed della videocamera nella finestra multimediale specificamente per gli utenti della lingua dei segni.
@@ -210,7 +223,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## 25.2.1
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - 🔄 **Consenti tentativi di ricostruzione OBS**: Introdurre la possibilità di forzare manualmente OBS a riconnettersi quando necessario.
 - 🗑️ **Auto Cleanup Old Export Date Folders**: Rimuovere automaticamente le cartelle di data di esportazione obsolete per mantenere lo storage organizzato.
@@ -246,7 +259,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## 24.10.10
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - **nuovo**: Aggiunte scorciatoie da tastiera per navigare all'elemento multimediale successivo/precedente
 - **nuovo**: Aggiunto un menu con il tasto destro del mouse agli elementi multimediali per nascondere gli elementi multimediali e rinominarli
@@ -254,6 +267,6 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## 24.10.9
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - **funzione**: Aggiunta un'opzione per eliminare tutti i file multimediali aggiuntivi per il giorno attualmente selezionato

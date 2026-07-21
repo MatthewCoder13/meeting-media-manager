@@ -4,6 +4,19 @@
 
 Pour la liste complète des changements entre les versions, consultez notre fichier CHANGELOG.md sur GitHub.
 
+## v26.7.7
+
+### ✨ Nouvelles fonctionnalités
+
+- ✨ **Qualité de l'aperçu du média**: L'aperçu des médias rend maintenant les images vidéo via la toile avec une mise à l'échelle descendante de haute qualité, corrigeant les aperçus jagged/flou (surtout sur le contenu lourd comme les chansons). L'aperçu s'auto-désactive également s'il doit corriger à plusieurs reprises la dérive de lecture sur une seule vidéo, avec un moyen simple de le réactiver.
+
+## v26.7.6
+
+### ✨ Nouvelles fonctionnalités
+
+- ✨ **Exclusion des vidéos de l'étude biblique de l'assemblée** : Ajout d'un paramètre permettant d'exclure les vidéos de l'étude biblique de l'assemblée de certaines publications (par défaut, le livre **Marche courageusement avec Dieu**), avec un sélecteur de publications permettant d'effectuer une recherche.
+- ✨ **Numéros de page des documents** : Les listes des médias pour les publications et les fichiers JWPUB affichent désormais le(s) numéro(s) de page(s) de chaque document après son titre. Cette fonction peut vous aider à retrouver rapidement un élément multimédia précis lorsque vous connaissez le numéro de page sur lequel il se trouve.
+
 ## v26.7.4
 
 ### ✨ Nouvelles fonctionnalités
