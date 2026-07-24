@@ -1803,6 +1803,25 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@openrouter/agent@npm:^0.8.0":
+  version: 0.8.0
+  resolution: "@openrouter/agent@npm:0.8.0"
+  dependencies:
+    "@openrouter/sdk": "npm:^0.13.7"
+    zod: "npm:^4.0.0"
+  checksum: 10c0/2f7c13b3594eee0a3c6986340b507c999acfff547ca3baf341f0eb0423da057aed7ee8428cb618b8a5531e6bc307cfe3a5b063e1066bccb410e55f20ab28600f
+  languageName: node
+  linkType: hard
+
+"@openrouter/sdk@npm:^0.13.7":
+  version: 0.13.67
+  resolution: "@openrouter/sdk@npm:0.13.67"
+  dependencies:
+    zod: "npm:^3.25.0 || ^4.0.0"
+  checksum: 10c0/acb0a399a4ee636cdb67a8baf021cd83fd378587b6eb875666247324536b79aa1611984820cc3608e6c1702946bc6d04ca44ca35d75dbb0c358f623cd4a1a340
+  languageName: node
+  linkType: hard
+
 "@opentelemetry/api-logs@npm:0.214.0":
   version: 0.214.0
   resolution: "@opentelemetry/api-logs@npm:0.214.0"
@@ -8443,6 +8462,7 @@ __metadata:
     "@intlify/unplugin-vue-i18n": "npm:^11.2.4"
     "@jitsi/robotjs": "npm:^0.6.24"
     "@numairawan/video-duration": "npm:^1.0.0"
+    "@openrouter/agent": "npm:^0.8.0"
     "@opentelemetry/api-logs": "npm:^0.220.0"
     "@pinia/testing": "npm:^2.0.1"
     "@quasar/app-vite": "npm:^3.0.1"
@@ -12825,6 +12845,13 @@ __metadata:
   version: 0.1.0
   resolution: "yocto-queue@npm:0.1.0"
   checksum: 10c0/dceb44c28578b31641e13695d200d34ec4ab3966a5729814d5445b194933c096b7ced71494ce53a0e8820685d1d010df8b2422e5bf2cdea7e469d97ffbea306f
+  languageName: node
+  linkType: hard
+
+"zod@npm:^3.25.0 || ^4.0.0, zod@npm:^4.0.0":
+  version: 4.4.3
+  resolution: "zod@npm:4.4.3"
+  checksum: 10c0/7ea31b558e88f9faf44f31dd185e2e1cbf51fed3081787fb96cc2534749b50c0acfc6da7f0922a7353ed092dd358c7d50c28ea96c94d04af64191bd33152eca3
   languageName: node
   linkType: hard
 
