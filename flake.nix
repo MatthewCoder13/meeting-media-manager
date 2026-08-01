@@ -17,7 +17,7 @@
         hash = "sha256-3ElNudFrY5oPbg3JuQv0ngyaDkNdSNfe0r/LL8yZ6JU=";
       };
 
-      package = pkgs.appimageTools.wrapType2 {
+      wrapper = pkgs.appimageTools.wrapType2 {
         pname = "meeting-media-manager";
         inherit version;
         src = appimage;
@@ -28,6 +28,33 @@
           platforms = [ "x86_64-linux" ];
           maintainers = [ ];
         };
+      };
+
+      extracted = pkgs.appimageTools.extractType2 {
+        pname = "meeting-media-manager";
+        inherit version;
+        src = appimage;
+      };
+
+      desktopItem = pkgs.makeDesktopItem {
+        name = "meeting-media-manager";
+        desktopName = "Meeting Media Manager";
+        comment = "A cross-platform app to download and present media for congregation meetings of Jehovah's Witnesses";
+        icon = "meeting-media-manager";
+        exec = "${wrapper}/bin/meeting-media-manager %U";
+        terminal = false;
+        categories = [ "Utility" ];
+        startupNotify = false;
+        startupWMClass = "Meeting Media Manager";
+      };
+
+      package = pkgs.symlinkJoin {
+        name = "meeting-media-manager-${version}";
+        paths = [ wrapper desktopItem ];
+        postBuild = ''
+          install -Dm644 "${extracted}/usr/share/icons/hicolor/512x512/apps/meeting-media-manager.png" "$out/share/icons/hicolor/512x512/apps/meeting-media-manager.png"
+        '';
+        meta = wrapper.meta;
       };
     in
     {
