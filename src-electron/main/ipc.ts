@@ -47,7 +47,9 @@ import {
   openFileDialog,
   openFolderDialog,
   saveFileDialog,
+  setExecutable,
   setPathProbeNotificationPaths,
+  startSecurityScopedAccess,
   unwatchFolders,
   unzipFile,
   watchFolder,
@@ -426,6 +428,10 @@ handleIpcInvoke(
     createVideoFromNonVideo(path, ffmpegPath, outputDir),
 );
 
+handleIpcInvoke('setExecutable', async (_e, path: string) =>
+  setExecutable(path),
+);
+
 handleIpcInvoke(
   'downloadFile',
   async (
@@ -449,6 +455,10 @@ handleIpcInvoke(
   'ensureMacosFolderPermission',
   async (_e, folderPath: string, prompt?: boolean) =>
     ensureMacosFolderPermission(folderPath, prompt),
+);
+
+handleIpcInvoke('startSecurityScopedAccess', async (_e, filePath: string) =>
+  startSecurityScopedAccess(filePath),
 );
 
 handleIpcInvoke(

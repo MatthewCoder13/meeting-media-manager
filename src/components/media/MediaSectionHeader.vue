@@ -26,8 +26,10 @@
 
     <q-item-section
       ref="sectionHeader"
-      class="col-grow"
-      :class="{ 'cursor-pointer': isHovered && isCustom }"
+      :class="{
+        'cursor-pointer': isHovered && isCustom,
+        'section-title': !isRenaming,
+      }"
       @click.stop="isCustom && !canCollapse ? undefined : () => {}"
       @dblclick="isCustom ? handleDoubleClick() : undefined"
     >
@@ -42,15 +44,13 @@
         @keyup.esc="handleRename(false)"
       />
       <template v-else>
-        <div class="text-bold text-uppercase text-spaced row justify-between">
-          {{
-            !mediaList.config?.label &&
-            (mediaList.config?.uniqueId === 'imported-media' ||
-              mediaList.config?.uniqueId.startsWith('custom-'))
-              ? t('imported-media')
-              : mediaList.config?.label || t(mediaList.config?.uniqueId)
-          }}
-        </div>
+        {{
+          !mediaList.config?.label &&
+          (mediaList.config?.uniqueId === 'imported-media' ||
+            mediaList.config?.uniqueId.startsWith('custom-'))
+            ? t('imported-media')
+            : mediaList.config?.label || t(mediaList.config?.uniqueId)
+        }}
         <div v-if="mediaList.config?.documentTitle" class="section-subtitle">
           {{ mediaList.config.documentTitle }}
         </div>
@@ -62,6 +62,7 @@
         <!-- Three-dots menu for other controls -->
         <template v-if="isCustom && !selectedDayMeetingType">
           <q-btn
+            :aria-label="t('more-options')"
             class="custom-text-color btn-tonal"
             flat
             icon="mmm-dots"
@@ -175,6 +176,7 @@
           "
         >
           <q-btn
+            :aria-label="t('stop-repeat-section')"
             color="positive"
             icon="mmm-repeat"
             round
@@ -190,8 +192,13 @@
         <!-- Add Media Button -->
         <template v-if="hasAddMediaButton">
           <q-btn
+            :aria-label="!buttonLabel ? tooltipText : undefined"
             class="add-media-shortcut btn-tonal"
-            :class="!buttonLabel ? 'custom-text-color' : undefined"
+            :class="
+              isCustom && selectedDayMeetingType !== 'we'
+                ? 'custom-text-color'
+                : undefined
+            "
             :color="
               !isCustom || (isCustom && selectedDayMeetingType === 'we')
                 ? mediaList.config?.uniqueId
@@ -212,6 +219,7 @@
         <!-- Chevron for collapsing (non-meeting days only) -->
         <template v-if="canCollapse">
           <q-btn
+            :aria-label="collapsed ? t('expand') : t('collapse')"
             class="btn-tonal"
             color="primary"
             flat
@@ -271,7 +279,7 @@ const emit = defineEmits<{
 const $q = useQuasar();
 const { t } = useI18n();
 const currentState = useCurrentStateStore();
-const { selectedDayMeetingType } = storeToRefs(currentState);
+const { currentSettings, selectedDayMeetingType } = storeToRefs(currentState);
 
 // Section repeat functionality
 const { isSectionRepeating, toggleSectionRepeat } = useMediaSectionRepeat();
@@ -289,6 +297,10 @@ const moreOptionsMenuActive = ref(false);
 
 // Computed properties
 const buttonLabel = computed(() => {
+  if (currentSettings.value?.compactAddMediaButton !== false) {
+    return undefined;
+  }
+
   if (!$q.screen.gt.xs) return undefined;
 
   if (props.isSongButton) {
@@ -423,9 +435,23 @@ defineExpose({
   border-radius: 4px;
 }
 
-// Sits below the (bold, uppercase) section title as a quieter second line,
-// so the specific document (e.g. this week's study article) reads as
-// detail rather than competing with the section name for attention.
+// Overrides the global .section-title (src/css/app.scss) just for this
+// component's instances. The template also puts Quasar's "row" (flex)
+// class on this div; flex wraps the raw text in an anonymous flex item
+// that has its own implicit min-width: auto, which defeats text-overflow
+// no matter what's set here. Forcing block layout removes that anonymous
+// flex item so the ellipsis rules below actually apply.
+.section-title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// Sits below the section title as a quieter second line, so the specific
+// document (e.g. this week's study article) reads as detail rather than
+// competing with the section name for attention.
 .section-subtitle {
   font-size: 0.8em;
   font-weight: 500;
@@ -434,4 +460,8 @@ defineExpose({
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+// .section-title lives in src/css/app.scss as a global utility - it's also
+// reused (unstyled here) by PresentWebsite.vue's section headers, which
+// share the same text-{id} convention.
 </style>

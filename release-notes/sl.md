@@ -4,11 +4,20 @@
 
 Za celoten seznam sprememb med različicami si oglejte našo datoteko CHANGELOG.md na GitHubu.
 
+## v26.8.0
+
+### ✨ Nove funkcije
+
+- ✨ **Celostna prenova aplikacije**: Obsežna vizualna in interakcijska osvežitev pogovornih oken, seznama multimedijske vsebine/glave, nastavitev in čarovnika za začetno nastavitev. Čarovnik za začetno nastavitev je zdaj zasnovan kot potek z enim vprašanjem na zaslon in s prikazom napredka. Vsa pozivna okna so bila zamenjana z enotnim, označenim pogovornim oknom, izbira obsega strani PDF (pri publikacijah in uvozu s povleci‑in‑spusti) pa zdaj uporablja izbirnik s predoglednimi sličicami namesto prostega vnosa besedila. Dodan je nov vodnik za hitri začetek po zaključku čarovnika. Vključuje tudi osvežen slog kartic/glav s sencami, prilagojenimi temnemu načinu, ter več popravkov kontrasta v temnem načinu (oznake aktivnih polj, odstotki napredka pri prenosu).
+- ✨ **Stran z nastavitvami**: Preoblikovana v dvopanelno postavitev z novim razdelkom za globalne nastavitve za stikala samodejnih/beta posodobitev, ki so bila premaknjena iz pogovornega okna »O programu« (to je zdaj izključno informativno).
+- ✨ **Gumb »Dodaj več multimedijske vsebine«**: Dodana nastavitev za izbiro tega, kateri razdelki shodov prikazujejo gumb »Dodaj več multimedijske vsebine«, skupaj z nastavitvijo za kompaktni način (samo ikona).
+- ✨ **Seznam multimedijske vsebine**: Postavke zdaj med dodajanjem prikazujejo okostja nalaganja namesto praznih mest. Skupine multimedijske vsebine prikazujejo število skritih postavk v znački (npr. »9 postavk (2 skriti)«). Podrejene postavke v skupini je mogoče razvrščati s povleci‑in‑spusti. Pri zelo ozkih širinah okna se postavke skrčijo v kompaktne oznake z namigi (tooltipi), da se vrstica ne preobremeni.
+
 ## v26.7.7
 
 ### ✨ Nove funkcije
 
-- ✨ **Media Preview Quality**: Media preview now renders video frames via canvas with high-quality downscaling, fixing jagged/blurry previews (especially on text-heavy content like songs). The preview also auto-disables itself if it has to repeatedly correct playback drift on a single video, with a one-click way to turn it back on.
+- ✨ **Kakovost predogleda multimedijske vsebine**: Predogled multimedijske vsebine zdaj izrisuje sličice videoposnetkov prek platna (canvas) z visokokakovostnim pomanjševanjem, kar odpravi nazobčane ali zamegljene predoglede (zlasti pri vsebini z veliko besedila, kot so pesmi). Predogled se tudi samodejno izklopi, če mora pri enem videoposnetku večkrat popravljati zamik predvajanja, pri čemer je na voljo možnost za ponovno vklop z enim klikom.
 
 ## v26.7.6
 
@@ -252,22 +261,22 @@ Za celoten seznam sprememb med različicami si oglejte našo datoteko CHANGELOG.
 
 ### ✨ Nove funkcije
 
-- **feat**: Predvajanje spletnega mesta je zdaj podprto tudi v macOS 🚀
-- **feat**: Dodane so bližnjice na tipkovnici za ustavitev, premor in nadaljevanje predvajanja multimedijske vsebine 🚀
-- **feat**: Dodana podpora za nastavitev spletnega naslova, s katerega naj se prenaša multimedijska vsebina 🚀
-- **feat**: Dodan je takojšnji izbirnik prizorov za OBS Studio in prenovljena funkcionalnost izbirnika prizorov v nastavitvah
-- **feat**: Razširjeno spletno mesto z dokumentacijo, ki zdaj podpira več jezikov
+- 🖥️ **Predvajanje spletnega mesta v macOS**: Predvajanje spletnega mesta je zdaj podprto tudi v macOS 🚀
+- ⌨️ **Bližnjice za predvajanje**: Dodane so tipkovne bližnjice za ustavitev, premor in nadaljevanje predvajanja multimedijske vsebine 🚀
+- 🌐 **Naslov za prenos multimedijske vsebine po meri**: Dodana je možnost nastavitve spletnega naslova, s katerega naj se prenaša multimedijska vsebina 🚀
+- 🎬 **Hitri izbirnik prizorov za OBS**: Dodan je takojšnji izbirnik prizorov za OBS Studio in prenovljena funkcionalnost izbirnika prizorov v nastavitvah
+- 📖 **Več jezikov dokumentacije**: Spletno mesto z dokumentacijo je razširjeno tako, da podpira več jezikov
 
 ## 24.10.10
 
 ### ✨ Nove funkcije
 
-- **novo**: Dodane bližnjice na tipkovnici za premikanje na naslednji oziroma prejšnji element multimedijske vsebine
-- **novo**: Dodan desni klik meni na elemente multimedijske vsebine za skrivanje elementov in preimenovanje
-- **novo**: Obrezani časi videov se zdaj pravilno upoštevajo pri uvoženih JWL seznamih predvajanja
+- ⌨️ **Bližnjice za krmarjenje po multimedijski vsebini**: Dodane so tipkovne bližnjice za prehod na naslednjo/prejšnjo multimedijsko vsebino
+- 🖱️ **Meni ob desnem kliku na multimedijsko vsebino**: Dodan je meni ob desnem kliku na multimedijsko vsebino za skrivanje in preimenovanje multimedijske vsebine
+- ✂️ **Obrezan uvoz seznama predvajanja**: Obrezani časi videoposnetkov v seznamu predvajanj JW Library se zdaj upoštevajo pri uvozu
 
 ## 24.10.9
 
 ### ✨ Nove funkcije
 
-- **feat**: Dodana možnost za brisanje vseh dodatnih multimedijskih datotek za trenutno izbrani dan
+- 🗑️ **Izbriši dodatno multimedijsko vsebino za dan**: Dodana je možnost za izbris vse dodatne multimedijske vsebine za trenutno izbrani dan

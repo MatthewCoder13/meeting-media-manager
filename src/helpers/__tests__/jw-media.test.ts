@@ -25,12 +25,13 @@ const getTempPathMock = vi.fn(async () => '/tmp');
 const isUsablePathMock = vi.fn(async () => true);
 const currentStateStore = {
   currentCongregation: '',
-  currentSettings: {},
+  currentLangObject: undefined as undefined | { isSignLanguage?: boolean },
+  currentSettings: {} as Record<string, unknown>,
   extractedFiles: {} as Record<string, string | undefined>,
   getMeetingType: vi.fn(),
 };
 const jwStore = {
-  jwMepsLanguages: { list: [] },
+  jwMepsLanguages: { list: [] as { LanguageId: number; Symbol: string }[] },
   lookupPeriod: {},
   urlVariables: {},
 };
@@ -80,6 +81,7 @@ vi.mock('src/helpers/export-media', () => ({
 }));
 
 vi.mock('src/helpers/fs', () => ({
+  getRendererPlatform: vi.fn(() => 'win32'),
   getSubtitlesUrl: vi.fn(),
   getThumbnailUrl: vi.fn(),
   registerMediaProviders: vi.fn(),
@@ -183,10 +185,12 @@ describe('jw-media helpers', () => {
     vi.resetModules();
     vi.clearAllMocks();
     currentStateStore.currentCongregation = '';
+    currentStateStore.currentLangObject = undefined;
     currentStateStore.currentSettings = {};
     currentStateStore.extractedFiles = {};
     currentStateStore.getMeetingType.mockReturnValue(null);
     jwStore.lookupPeriod = {};
+    jwStore.jwMepsLanguages = { list: [] };
 
     extractNestedZipEntryMock.mockResolvedValue({ path: '/tmp/db.db' });
     getZipEntriesMock.mockResolvedValue({});
@@ -330,6 +334,39 @@ describe('jw-media helpers', () => {
     expect(errorCatcherMock).not.toHaveBeenCalled();
   });
 
+  it('does not report a copy failure that is expected flakiness on a cloud-synced additional-media destination', async () => {
+    const { trimFilepathAsNeeded } = await import('src/utils/fs');
+    const { sanitizeId } = await import('src/utils/general');
+
+    vi.mocked(trimFilepathAsNeeded).mockImplementation((p: string) => p);
+    vi.mocked(sanitizeId).mockImplementation((value: string) => value);
+    (
+      currentStateStore as unknown as {
+        getDatedAdditionalMediaDirectory: () => Promise<string>;
+      }
+    ).getDatedAdditionalMediaDirectory = vi.fn(
+      async () =>
+        String.raw`C:\Users\test\OneDrive\Pictures\Additional Media\cong\20260801`,
+    );
+    pathExistsMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    copyMock.mockRejectedValue(
+      Object.assign(new Error('UNKNOWN: unknown error, copyfile'), {
+        code: 'UNKNOWN',
+      }),
+    );
+
+    const { copyToDatedAdditionalMedia } = await import('../jw-media');
+
+    await expect(
+      copyToDatedAdditionalMedia(
+        String.raw`C:\Users\test\OneDrive\Desktop\photo.jpeg`,
+        undefined,
+      ),
+    ).resolves.toBe('');
+
+    expect(errorCatcherMock).not.toHaveBeenCalled();
+  });
+
   it('creates watched folders for meeting days with dynamic media', async () => {
     const meetingDate = new Date('2026-06-14T12:00:00.000Z');
     const childDynamicDate = new Date('2026-06-21T12:00:00.000Z');
@@ -417,6 +454,39 @@ describe('jw-media helpers', () => {
 
     expect(isUsablePathMock).toHaveBeenCalledWith(String.raw`\\?`);
     expect(ensureDirMock).not.toHaveBeenCalled();
+    expect(errorCatcherMock).not.toHaveBeenCalled();
+  });
+
+  it('tolerates a mapped-drive EINVAL when creating a watched folder', async () => {
+    const meetingDate = new Date('2026-06-14T12:00:00.000Z');
+    currentStateStore.currentCongregation = 'abc';
+    currentStateStore.currentSettings = {
+      enableFolderWatcher: true,
+      // A Google Drive Stream-style virtual drive letter can briefly
+      // unmount, making even the drive root fail recursive mkdir.
+      folderToWatch: String.raw`H:\Meu Drive\MIDIAS Cong Leste`,
+    };
+    currentStateStore.getMeetingType.mockReturnValue('we');
+    formatDateMock.mockReturnValue('2026-06-14');
+    jwStore.lookupPeriod = {
+      abc: [
+        {
+          date: meetingDate,
+          mediaSections: [{ items: [{ source: 'dynamic' }] }],
+        },
+      ],
+    };
+    ensureDirMock.mockRejectedValueOnce(
+      Object.assign(new Error("EINVAL: invalid argument, mkdir 'H:'"), {
+        code: 'EINVAL',
+        syscall: 'mkdir',
+      }),
+    );
+
+    const { ensureWatchedMeetingDayFolders } = await import('../jw-media');
+
+    await ensureWatchedMeetingDayFolders();
+
     expect(errorCatcherMock).not.toHaveBeenCalled();
   });
 
@@ -626,5 +696,78 @@ describe('jw-media helpers', () => {
     expect(pubMediaIds).toContain('wcg');
     expect(result).toHaveLength(2);
     expect(result.find((m) => m.pubMediaId === 'wcg')?.cbs).toBe(false);
+  });
+
+  describe('processMissingMediaInfo language resolution for sign-language congregations', () => {
+    // A video embedded inside a nested extract publication (e.g. a lesson
+    // pulled in from "lff", referencing a clip from "lrc") that isn't
+    // available in the congregation's sign language, but does carry a
+    // different, real sign language (here ASL) on its own MepsLanguageIndex.
+    const nestedExtractVideo: MultimediaItem = {
+      BeginParagraphOrdinal: 20,
+      Caption: '',
+      CategoryType: 1,
+      DocumentId: 21,
+      FilePath: '',
+      IssueTagNumber: 0,
+      KeySymbol: 'lrc',
+      Label: '',
+      MajorType: 1,
+      MepsLanguageIndex: 420,
+      MimeType: 'video/mp4',
+      MultimediaId: 391,
+      TargetParagraphNumberLabel: 0,
+      Track: 1,
+    };
+
+    const getLoggedLanguageResolution = () =>
+      logMock.mock.calls.find(
+        (call) => call[0] === '[processMissingMediaInfo] Language resolution',
+      )?.[3];
+
+    beforeEach(() => {
+      currentStateStore.currentSettings = { lang: 'LSQ', langFallback: 'F' };
+      currentStateStore.currentLangObject = { isSignLanguage: true };
+      jwStore.jwMepsLanguages = { list: [{ LanguageId: 420, Symbol: 'ASL' }] };
+    });
+
+    it('trusts a nested extract video language once verified against that extract database', async () => {
+      const { processMissingMediaInfo } = await import('../jw-media');
+
+      await processMissingMediaInfo({
+        allMedia: [{ ...nestedExtractVideo }],
+        // What getDocumentExtractItems now contributes: language data read
+        // directly from the nested extract's own database (see
+        // getExtractMultimedia / getMepsLanguagesByMediaItem in sqlite.ts).
+        mepsLanguagesByMediaItem: [
+          {
+            IssueTagNumber: 0,
+            KeySymbol: 'lrc',
+            MepsLanguageIndex: 420,
+            Track: 1,
+          },
+        ],
+      });
+
+      expect(getLoggedLanguageResolution()).toMatchObject({
+        langsWritten: ['LSQ', 'ASL', 'F'],
+      });
+    });
+
+    it('falls back straight to the configured fallback language when the nested video language cannot be verified', async () => {
+      const { processMissingMediaInfo } = await import('../jw-media');
+
+      await processMissingMediaInfo({
+        allMedia: [{ ...nestedExtractVideo }],
+        // No cross-reference data available for this KeySymbol at all (the
+        // pre-fix behavior, and still correct when a MepsLanguageIndex truly
+        // can't be verified for a sign-language congregation).
+        mepsLanguagesByMediaItem: [],
+      });
+
+      expect(getLoggedLanguageResolution()).toMatchObject({
+        langsWritten: ['LSQ', 'F'],
+      });
+    });
   });
 });

@@ -270,6 +270,26 @@ const cleanupMediaElement = (element: HTMLMediaElement | null | undefined) => {
   }
 };
 
+const IMAGE_DECODE_TIMEOUT_MS = 500;
+
+// Waits for an image to be decoded (ready to paint without jank), capped by a
+// timeout so a slow/failed decode can't hang the crossfade indefinitely.
+const waitForImageDecode = (url: string): Promise<void> => {
+  const img = new Image();
+  img.src = url;
+
+  const decodeAttempt =
+    typeof img.decode === 'function'
+      ? img.decode().catch(() => undefined)
+      : Promise.resolve();
+
+  const fallback = new Promise<void>((resolve) => {
+    setTimeout(resolve, IMAGE_DECODE_TIMEOUT_MS);
+  });
+
+  return Promise.race([decodeAttempt, fallback]);
+};
+
 const isEnding = ref(false);
 
 // Display layer state management
@@ -717,6 +737,13 @@ const handleVideoCanPlay = () => {
 const fadeOutDurationInSeconds = MEDIA_STOP_FADE_DURATION_SECONDS;
 const fadeOutDurationInMilliseconds = fadeOutDurationInSeconds * 1000;
 
+// When OBS integration is on, keep the yeartext layer blanked for this long
+// after media stops before revealing it again, so it doesn't flash through
+// while OBS is still mid-transition away from the media scene. Mirrors the
+// 600ms delay MediaCalendarPage.vue uses for the opposite (media-starting)
+// case.
+const OBS_CAMERA_SCENE_REVEAL_DELAY_MS = 600;
+
 const playMedia = () => {
   log(
     '🔄 [playMedia] Playing media',
@@ -748,7 +775,14 @@ const playMedia = () => {
           postCurrentTime(currentTime);
           lastUpdate = Date.now();
         } catch (e) {
-          errorCatcher(e);
+          // The BroadcastChannel can close mid-flight if this window is
+          // being torn down while a throttled update was already queued -
+          // expected shutdown race, not a real failure.
+          if (!(
+            e instanceof Error && e.message.includes('Channel is closed')
+          )) {
+            errorCatcher(e);
+          }
         }
       }
 
@@ -820,7 +854,7 @@ const crossfadeToNewMedia = (newUrl: string) => {
   }
 
   // Fade in the new layer
-  setTimeout(() => {
+  const startFadeIn = () => {
     if (nextLayer.value.url !== newUrl) {
       return;
     }
@@ -845,7 +879,22 @@ const crossfadeToNewMedia = (newUrl: string) => {
       }
       isTransitioning.value = false;
     }, fadeOutDurationInMilliseconds); // Match the CSS transition duration
-  }, 50); // Small delay to ensure the new media starts loading
+  };
+
+  const hasOutgoingLayer =
+    !!currentLiveLayer && currentLiveLayer.value !== nextLayer.value;
+
+  if (isImage(newUrl) && hasOutgoingLayer) {
+    // Wait for the new image to actually be decoded before starting the
+    // crossfade, so the outgoing layer never fades out ahead of the
+    // incoming one having pixels to show.
+    waitForImageDecode(newUrl).then(() => {
+      setTimeout(startFadeIn, 50);
+    });
+  } else {
+    // Small delay to ensure the new media starts loading
+    setTimeout(startFadeIn, 50);
+  }
 };
 
 // Handle clearing media (fade out current layer)
@@ -857,6 +906,17 @@ const clearCurrentMedia = () => {
   if (currentLiveLayer?.value.url) {
     const clearingUrl = currentLiveLayer.value.url;
     const clearingToken = ++currentLiveLayer.value.token;
+
+    // When OBS is enabled, hide the yeartext layer for a beat so it doesn't
+    // flash through while OBS is still transitioning away from the media
+    // scene (mirrors the entry-side delay in MediaCalendarPage.vue). Without
+    // OBS, there's no scene transition to hide behind, so leave behavior as-is.
+    if (obsEnabled.value && !isAudio(clearingUrl)) {
+      isTransitioning.value = true;
+      setTimeout(() => {
+        isTransitioning.value = false;
+      }, OBS_CAMERA_SCENE_REVEAL_DELAY_MS);
+    }
 
     // Skip zoom/pan animation when clearing media
     if (isImage(clearingUrl)) {
@@ -924,6 +984,10 @@ const { data: online } = useBroadcastChannel<boolean, boolean>({
 
 const { data: hideMediaLogo } = useBroadcastChannel<boolean, boolean>({
   name: 'hide-media-logo',
+});
+
+const { data: obsEnabled } = useBroadcastChannel<boolean, boolean>({
+  name: 'obs-enabled',
 });
 
 const { post: postMediaPlayingAction } = useBroadcastChannel<string, string>({
@@ -1489,13 +1553,13 @@ onBeforeUnmount(() => {
   left: 0;
   width: 100%;
   height: 100%;
+  background-color: black;
   opacity: 0;
   transition: opacity 0.3s ease-in-out;
   z-index: 2;
 }
 
 .display-layer.is-live {
-  background-color: black;
   opacity: 1;
   z-index: 3;
 }

@@ -4,11 +4,20 @@
 
 Pour la liste complète des changements entre les versions, consultez notre fichier CHANGELOG.md sur GitHub.
 
+## v26.8.0
+
+### ✨ Nouvelles fonctionnalités
+
+- ✨ **Refonte complète de l'application** : Une mise à jour visuelle et fonctionnelle à grande échelle touchant les boîtes de dialogue, l'en-tête et la liste des médias, les paramètres et l'assistant de configuration. L'assistant de configuration se présente désormais sous la forme d'un parcours comportant une question par écran, accompagné d'une barre de progression. Toutes les invites ont été remplacées par une boîte de dialogue cohérente avec l'identité visuelle de l'application, et la sélection d'une plage de pages dans un PDF (pour les publications et les importations par glisser-déposer) s'effectue désormais à l'aide d'un sélecteur sous forme de grille de vignettes, au lieu d'une invite de saisie libre. Ajout d'un nouveau guide de démarrage rapide à la fin de l'assistant d'installation. Comprend également un nouveau style pour les fiches et les en-têtes, avec des ombres adaptées au mode sombre, ainsi que plusieurs corrections de contraste en mode sombre (libellés des champs actifs, pourcentages de progression des téléchargements).
+- ✨ **Page des paramètres** : Réorganisée en une mise en page à deux volets, avec une nouvelle section « Préférences globales » permettant d'activer ou de désactiver les mises à jour automatiques et les mises à jour bêta, qui a été déplacée hors de la boîte de dialogue « À propos » (qui est désormais purement informationnelle).
+- ✨ **Bouton « Ajouter d'autres éléments multimédias »** : Ajout d'un paramètre permettant de choisir précisément les sections de la réunion pour lesquelles le bouton de raccourci « Ajouter d'autres éléments multimédias » doit s'afficher, ainsi qu'un paramètre pour un mode compact qui n'affiche que les icônes.
+- ✨ **Liste des médias** : Les éléments s'affichent désormais sous forme de silhouettes de chargement pendant leur ajout, au lieu de ne pas apparaître du tout ; les groupes de médias indiquent le nombre d'éléments masqués dans leur badge (par exemple « 9 éléments (2 masq.) ») ; les éléments secondaires d'un groupe peuvent être réorganisés par glisser-déposer ; et lorsque la largeur de la fenêtre est très réduite, les éléments se replient en petites icônes compactes accompagnées d'une info-bulle, au lieu d'encombrer la ligne.
+
 ## v26.7.7
 
 ### ✨ Nouvelles fonctionnalités
 
-- ✨ **Qualité de l'aperçu du média**: L'aperçu des médias rend maintenant les images vidéo via la toile avec une mise à l'échelle descendante de haute qualité, corrigeant les aperçus jagged/flou (surtout sur le contenu lourd comme les chansons). L'aperçu s'auto-désactive également s'il doit corriger à plusieurs reprises la dérive de lecture sur une seule vidéo, avec un moyen simple de le réactiver.
+- ✨ **Qualité de l’aperçu des médias** : L’aperçu des médias affiche désormais les images des vidéos avec une mise à l’échelle de haute qualité, ce qui corrige les aperçus saccadés ou flous (en particulier pour les contenus comportant beaucoup de texte, comme les cantiques). L'aperçu se désactive également automatiquement si elle doit corriger à plusieurs reprises un décalage de lecture sur une même vidéo, mais il est possible de la réactiver d'un simple clic.
 
 ## v26.7.6
 
@@ -251,22 +260,22 @@ Pour la liste complète des changements entre les versions, consultez notre fich
 
 ### ✨ Nouvelles fonctionnalités
 
-- **fonctionnalité** : La présentation du site web est désormais prise en charge sur macOS 🚀
-- **fonctionnalité** : Ajout de raccourcis clavier pour arrêter, mettre en pause et reprendre la lecture multimédia 🚀
-- **fonctionnalité** : Possibilité de définir l'adresse Web à partir de laquelle les fichiers multimédias doivent être téléchargés 🚀
-- **fonctionnalité** : Ajout du sélecteur de scènes instantané pour OBS Studio et refonte de la fonctionnalité du sélecteur de scènes dans les paramètres
-- **fonctionnalité** : Amélioration du site web de documentation pour prendre en charge davantage de langues
+- 🖥️ **Présentation du site web sous macOS** : La rediffusion du site web est désormais prise en charge sous macOS 🚀
+- ⌨️ **Raccourcis clavier pour la lecture** : Ajout de raccourcis clavier pour arrêter, mettre en pause et reprendre la lecture des fichiers multimédias 🚀
+- 🌐 **Adresse de téléchargement personnalisée des fichiers multimédias** : Ajout de la prise en charge de la configuration de l'adresse Web à partir de laquelle les fichiers multimédias doivent être téléchargés 🚀
+- 🎬 **Sélecteur de scènes instantané OBS** : Ajout d'un sélecteur de scènes instantané pour OBS Studio et refonte de la fonctionnalité du sélecteur de scènes dans les paramètres
+- 📖 **Plus de langues pour la documentation** : Le site web de documentation a été enrichi pour prendre en charge davantage de langues
 
 ## 24.10.10
 
 ### ✨ Nouvelles fonctionnalités
 
-- **nouveau** : Ajout de raccourcis clavier pour accéder à l'élément média suivant/précédent
-- **nouveau** : Ajout d'un menu contextuel permettant de masquer et de renommer les éléments multimédias
-- **nouveau** : Les durées des vidéos découpées sont désormais prises en compte dans les listes de lecture JWL importées
+- ⌨️ **Raccourcis de navigation entre les fichiers multimédias** : Ajout de raccourcis clavier pour passer au fichier multimédia suivant ou précédent
+- 🖱️ **Menu contextuel des éléments multimédias** : Ajout d'un menu contextuel permettant de masquer et de renommer les éléments multimédias
+- ✂️ **Importation de playlists JWL avec durées raccourcies** : Les durées raccourcies des vidéos sont désormais prises en compte dans les playlists JWL importées
 
 ## 24.10.9
 
 ### ✨ Nouvelles fonctionnalités
 
-- **fonctionnalité** : Ajout d'une option pour supprimer tous les fichiers multimédias supplémentaires pour le jour sélectionné
+- 🗑️ **Supprimer les fichiers multimédias supplémentaires pour une journée** : Ajout d'une option permettant de supprimer tous les fichiers multimédias supplémentaires correspondant à la journée actuellement sélectionnée

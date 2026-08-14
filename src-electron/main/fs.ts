@@ -10,8 +10,10 @@ import { app, dialog } from 'electron';
 import { ensureDir, type Stats } from 'fs-extra';
 import { createReadStream, createWriteStream } from 'node:fs';
 import {
+  chmod,
   copyFile,
   mkdir,
+  open,
   readdir,
   readFile,
   rm,
@@ -100,7 +102,10 @@ const isRetryableZipError = (error: unknown, zipPath?: string) => {
   // briefly locked by the sync agent - worth a retry there even though
   // those codes aren't retryable in general (e.g. a genuinely missing/
   // invalid file on local disk).
-  return !!zipPath && isExpectedNetworkPathAccessError(error, dirname(zipPath));
+  return (
+    !!zipPath &&
+    isExpectedNetworkPathAccessError(error, dirname(zipPath), process.platform)
+  );
 };
 
 const isIncompleteZipReadError = (message: string) =>
@@ -451,7 +456,7 @@ const getNearestSecurityScopedBookmark = async (filePath: string) => {
   return nearest;
 };
 
-const startSecurityScopedAccess = async (filePath: string) => {
+export const startSecurityScopedAccess = async (filePath: string) => {
   if (process.platform !== 'darwin') return false;
 
   const nearest = await getNearestSecurityScopedBookmark(filePath);
@@ -589,6 +594,58 @@ const getProbePathContext = (basePath: string) => {
   return { resolvedBase, testDir, testFile };
 };
 
+const PROBE_EXISTING_FILE_MAX_DEPTH = 4;
+const PROBE_EXISTING_FILE_SCAN_LIMIT = 200;
+
+/**
+ * Finds a pre-existing regular file under basePath (bounded depth/breadth,
+ * so this stays cheap even for a large cache folder). Returns undefined if
+ * the folder is empty/unreadable - there's nothing pre-existing to probe
+ * yet, which is expected on first-ever setup.
+ */
+const findExistingProbeFile = async (
+  basePath: string,
+  depth = 0,
+): Promise<string | undefined> => {
+  if (depth > PROBE_EXISTING_FILE_MAX_DEPTH) return undefined;
+
+  const dirents = await readdir(basePath, { withFileTypes: true }).catch(
+    () => [],
+  );
+
+  const subdirs: string[] = [];
+  for (const dirent of dirents.slice(0, PROBE_EXISTING_FILE_SCAN_LIMIT)) {
+    const fullPath = join(basePath, dirent.name);
+    if (dirent.isFile()) return fullPath;
+    if (dirent.isDirectory()) subdirs.push(fullPath);
+  }
+
+  for (const subdir of subdirs) {
+    const found = await findExistingProbeFile(subdir, depth + 1);
+    if (found) return found;
+  }
+
+  return undefined;
+};
+
+/**
+ * Opens and reads a byte of an existing file to confirm it's actually
+ * readable. macOS's per-app Documents/Desktop/Downloads protection (TCC)
+ * only gates reading files the app didn't just create itself - a brand-new
+ * probe file (create, write, delete) is always readable regardless of
+ * whether the user has actually granted folder access, so it can't detect a
+ * missing/stale grant. Probing a file that already existed before this
+ * process touched the folder exercises the real read path instead.
+ */
+const verifyExistingFileReadable = async (filePath: string) => {
+  const handle = await open(filePath, 'r');
+  try {
+    await handle.read(Buffer.alloc(1), 0, 1, 0);
+  } finally {
+    await handle.close();
+  }
+};
+
 const isInvalidWindowsResolvedPath = (resolvedBase: string) => {
   if (process.platform !== 'win32') return false;
 
@@ -691,7 +748,7 @@ export const setPathProbeNotificationPaths = (paths: string[] = []) => {
 
 const hasPossibleNetworkPathInNotificationSettings = () => {
   return [...pathProbeNotificationPaths].some((path) =>
-    isPossiblyNetworkFolderPath(path),
+    isPossiblyNetworkFolderPath(path, process.platform),
   );
 };
 
@@ -763,7 +820,12 @@ export function isUsablePath(basePath?: string): Promise<boolean> {
   if (!isUsablePathPromises.has(basePath)) {
     const promise = (async () => {
       const { resolvedBase, testDir, testFile } = getProbePathContext(basePath);
-      const likelyNetworkPath = isPossiblyNetworkFolderPath(basePath);
+      const likelyNetworkPath = isPossiblyNetworkFolderPath(
+        basePath,
+        process.platform,
+      );
+
+      let probeStage: 'cleanup' | 'read-existing' | 'write' = 'write';
 
       try {
         if (isInvalidWindowsResolvedPath(resolvedBase)) {
@@ -775,7 +837,16 @@ export function isUsablePath(basePath?: string): Promise<boolean> {
         await writeFile(testFile, 'ok');
         await delay(PATH_PROBE_SETTLE_DELAY_MS);
 
+        probeStage = 'cleanup';
         await cleanupProbe(basePath, testDir, testFile);
+
+        if (process.platform === 'darwin') {
+          probeStage = 'read-existing';
+          const existingFile = await findExistingProbeFile(resolvedBase);
+          if (existingFile) {
+            await verifyExistingFileReadable(existingFile);
+          }
+        }
 
         return true;
       } catch (e) {
@@ -784,6 +855,7 @@ export function isUsablePath(basePath?: string): Promise<boolean> {
         const transientNetworkError = isExpectedNetworkPathAccessError(
           e,
           basePath,
+          process.platform,
         );
         if (hasPossibleNetworkPathInNotificationSettings()) {
           notifyPathProbeNetworkWarning();
@@ -797,6 +869,7 @@ export function isUsablePath(basePath?: string): Promise<boolean> {
             hasConfiguredNetworkPath:
               hasPossibleNetworkPathInNotificationSettings(),
             likelyNetworkPath,
+            probeStage,
             resolvedBase,
             testDir,
           },
@@ -807,7 +880,13 @@ export function isUsablePath(basePath?: string): Promise<boolean> {
           captureElectronError(e, {
             contexts: {
               fn: {
-                args: { basePath, likelyNetworkPath, resolvedBase, testDir },
+                args: {
+                  basePath,
+                  likelyNetworkPath,
+                  probeStage,
+                  resolvedBase,
+                  testDir,
+                },
                 name: 'isUsablePath',
               },
             },
@@ -914,6 +993,33 @@ export async function saveFileDialog(
     defaultPath,
     filters,
   });
+}
+
+/**
+ * Gives a file the executable bit, on the platforms that have one.
+ *
+ * Unzipping does not carry permissions across — yauzl reports an entry's mode
+ * but nothing here applies it, so every extracted file lands as 0644. That is
+ * harmless for publication content, but the FFmpeg binary the app downloads for
+ * itself is extracted the same way and then cannot be spawned at all.
+ *
+ * Windows decides executability by extension and has no bit to set, so there is
+ * nothing to do there.
+ *
+ * @param path The file to make executable
+ * @returns Whether the file can be executed afterwards
+ */
+export async function setExecutable(path: string): Promise<boolean> {
+  if (process.platform === 'win32') return true;
+  try {
+    await chmod(path, 0o755);
+    return true;
+  } catch (error) {
+    captureElectronError(error, {
+      contexts: { fn: { name: 'setExecutable', path } },
+    });
+    return false;
+  }
 }
 
 /**
@@ -1143,6 +1249,8 @@ const decompress = async (
   output: string,
   opts?: UnzipOptions,
 ): Promise<UnzipResult[]> => {
+  await startSecurityScopedAccess(input);
+
   const stats = await stat(input).catch(() => undefined);
   const fileSize = stats?.size ?? 0;
   const isDirectorySource = !!stats?.isDirectory?.();
@@ -1262,7 +1370,10 @@ const getZipDiagnostics = (zipPath: string, fileSize: number) => {
     cloudProvider,
     fileSize,
     isCloudStoragePath: !!cloudProvider,
-    isPossiblyNetworkPath: isPossiblyNetworkFolderPath(dirname(zipPath)),
+    isPossiblyNetworkPath: isPossiblyNetworkFolderPath(
+      dirname(zipPath),
+      process.platform,
+    ),
     zipPath,
   };
 };
@@ -1289,10 +1400,14 @@ const attemptZipLocalFallbackCopy = async (
   zipPath: string,
   error: unknown,
 ): Promise<string | undefined> => {
-  if (!isPossiblyNetworkFolderPath(dirname(zipPath))) return undefined;
+  if (!isPossiblyNetworkFolderPath(dirname(zipPath), process.platform)) {
+    return undefined;
+  }
 
   const userDataPath = app.getPath('userData');
-  if (isPossiblyNetworkFolderPath(userDataPath)) return undefined;
+  if (isPossiblyNetworkFolderPath(userDataPath, process.platform)) {
+    return undefined;
+  }
 
   const localDir = join(userDataPath, 'Temp', LOCAL_FALLBACK_SUBFOLDER, uuid());
   const localPath = join(localDir, basename(zipPath));
@@ -1335,6 +1450,8 @@ const cleanupZipLocalFallbackCopy = async (localPath: string) => {
 };
 
 const getZipFileStats = async (zipPath: string) => {
+  await startSecurityScopedAccess(zipPath);
+
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= ZIP_OPEN_RETRY_COUNT; attempt++) {
@@ -1854,7 +1971,10 @@ export async function unwatchFolders() {
 }
 
 export async function watchFolder(folderPath: string) {
-  const pathIsPossiblyNetwork = isPossiblyNetworkFolderPath(folderPath);
+  const pathIsPossiblyNetwork = isPossiblyNetworkFolderPath(
+    folderPath,
+    process.platform,
+  );
 
   watchers.add(
     filesystemWatch(folderPath, {
@@ -1893,7 +2013,9 @@ export async function watchFolder(folderPath: string) {
             isPossiblyNetwork: pathIsPossiblyNetwork,
           });
 
-          if (shouldIgnoreWatchFolderError(folderPath, e)) return;
+          if (shouldIgnoreWatchFolderError(folderPath, e, process.platform)) {
+            return;
+          }
           captureElectronError(error, context);
         } catch (err) {
           // Log the failure of the original try

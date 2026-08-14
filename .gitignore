@@ -2,6 +2,11 @@
 .thumbs.db
 node_modules
 
+# Personal local scratch files
+/qa-checklist.html
+/design-audit-notes.md
+/settings-mockup.html
+
 # Quasar core related directories
 .quasar
 /dist
