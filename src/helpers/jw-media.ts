@@ -44,6 +44,7 @@ import {
 import { errorCatcher } from 'src/helpers/error-catcher';
 import { exportAllDays } from 'src/helpers/export-media';
 import {
+  getRendererPlatform,
   getSubtitlesUrl,
   getThumbnailUrl,
   registerMediaProviders,
@@ -53,6 +54,7 @@ import { updateLastUsedDate } from 'src/helpers/usage';
 import {
   getFilesystemErrorCode,
   isCloudStoragePath,
+  isExpectedNetworkPathAccessError,
   isPossiblyNetworkFolderPath,
 } from 'src/shared/filesystem-errors';
 import { NETWORK_ERROR_CODES } from 'src/shared/network-errors';
@@ -102,6 +104,7 @@ import {
   getMediaVideoMarkers,
   getMepsLanguagesByMediaItem,
   getPublicationInfoFromDb,
+  type MepsLanguageByMediaItem,
   registerSqliteProviders,
   tableExists,
 } from 'src/utils/sqlite';
@@ -151,10 +154,16 @@ const mediaItemIsDynamic = (item?: MediaItem): boolean => {
 };
 
 export const ensureWatchedMeetingDayFolders = async () => {
+  // Tracked outside the try block so the catch below can both report which
+  // folder failed and check whether the failure is expected flakiness on a
+  // network/cloud-sync drive (e.g. a virtual drive letter briefly
+  // unmounted).
+  let watchFolder: string | undefined;
+
   try {
     const currentStateStore = useCurrentStateStore();
     const { currentCongregation, currentSettings } = currentStateStore;
-    const watchFolder = currentSettings?.folderToWatch;
+    watchFolder = currentSettings?.folderToWatch;
     if (
       !currentCongregation ||
       !currentSettings?.enableFolderWatcher ||
@@ -187,10 +196,22 @@ export const ensureWatchedMeetingDayFolders = async () => {
       await ensureDir(join(watchFolder, folderName));
     }
   } catch (error) {
+    if (
+      watchFolder &&
+      isExpectedNetworkPathAccessError(
+        error,
+        watchFolder,
+        getRendererPlatform(),
+      )
+    ) {
+      return;
+    }
+
     errorCatcher(error, {
       contexts: {
         fn: {
           name: 'ensureWatchedMeetingDayFolders',
+          watchFolder,
         },
       },
     });
@@ -460,7 +481,7 @@ const isJwpubFileUnavailableError = (error: unknown, jwpubPath: string) => {
   if (errorCode === 'ENOENT') return true;
   if (isCloudStorageReadError(error)) return true;
   return (
-    isPossiblyNetworkFolderPath(dirname(jwpubPath)) &&
+    isPossiblyNetworkFolderPath(dirname(jwpubPath), getRendererPlatform()) &&
     ['EINVAL', 'UNKNOWN'].includes(errorCode ?? '')
   );
 };
@@ -1224,9 +1245,15 @@ export const copyToDatedAdditionalMedia = async (
     currentStateStore.selectedDate,
   );
 
+  // Tracked outside the try block so the catch below can check whether a
+  // copy failure is expected flakiness on a cloud-synced source/destination
+  // (same EINVAL/ENOENT/UNKNOWN-on-network-path pattern already tolerated
+  // for jwpub reads - see isJwpubFileUnavailableError above).
+  let datedAdditionalMediaPath: string | undefined;
+
   try {
     if (!filepathToCopy || !(await pathExists(filepathToCopy))) return '';
-    let datedAdditionalMediaPath = join(
+    datedAdditionalMediaPath = join(
       datedAdditionalMediaDir,
       basename(filepathToCopy),
     );
@@ -1262,6 +1289,18 @@ export const copyToDatedAdditionalMedia = async (
     }
     return datedAdditionalMediaPath;
   } catch (error) {
+    const platform = getRendererPlatform();
+    if (
+      isExpectedNetworkPathAccessError(error, filepathToCopy, platform) ||
+      (datedAdditionalMediaPath &&
+        isExpectedNetworkPathAccessError(
+          error,
+          datedAdditionalMediaPath,
+          platform,
+        ))
+    ) {
+      return '';
+    }
     errorCatcher(error);
     return '';
   }
@@ -1298,9 +1337,19 @@ export const createMediaItemFromPath = async (
       basename(additionalFilePath).replace(extname(additionalFilePath), '');
 
     if (!uniqueId) {
+      // Two clips trimmed from the same underlying file (e.g. different
+      // verse ranges from the same Bible chapter video) would otherwise
+      // collide on the same uniqueId and get silently dropped as a
+      // duplicate by addUniqueByIdAt - so fold the trim range in, matching
+      // the durationPart approach in mapDynamicMediaItem.
+      const durationPart =
+        customDuration?.min || customDuration?.max
+          ? `${customDuration.min ?? ''}_${customDuration.max ?? ''}-`
+          : '';
       uniqueId = sanitizeId(
         formatDate(currentStateStore.selectedDate, 'YYYYMMDD') +
           '-' +
+          durationPart +
           pathToFileURL(additionalFilePath),
       );
     }
@@ -1493,13 +1542,21 @@ const resolveDownloadedFile = async (
 ) => {
   const maxAttempts = 10;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (await pathExists(destinationPath)) {
-      const statistics = await stat(destinationPath);
-      const hasExpectedSize = remoteSize <= 0 || statistics.size === remoteSize;
-      if (statistics.size > 0 && hasExpectedSize) {
-        resolve({ new: true, path: destinationPath });
-        return;
+    try {
+      if (await pathExists(destinationPath)) {
+        const statistics = await stat(destinationPath);
+        const hasExpectedSize =
+          remoteSize <= 0 || statistics.size === remoteSize;
+        if (statistics.size > 0 && hasExpectedSize) {
+          resolve({ new: true, path: destinationPath });
+          return;
+        }
       }
+    } catch {
+      // The file can vanish between the pathExists() check and stat() if a
+      // concurrent cache-clear pass removes it (MMM-V2-3GB/3GA were
+      // unhandled rejections from this race). Treat it as not-ready-yet
+      // and let the retry loop below re-check.
     }
     await new Promise((settle) => {
       setTimeout(settle, 200);
@@ -1659,8 +1716,23 @@ const getMeetingDayRefreshCandidate = async (
     logIncompleteMeeting(day, index, meetingType);
   }
 
-  const allMedia = Object.values(day.mediaSections ?? {}).flatMap(
-    (section) => section.items || [],
+  // dynamicMediaMapper groups media sharing an extractCaption (e.g. every
+  // reference-publication citation) under a synthetic parent wrapper, with
+  // the actual playable items nested in that parent's `children` - a flat
+  // section.items pass alone never reaches them, so a missing file inside a
+  // group (checkMissingDynamicMediaFile itself already skips the wrapper via
+  // its own children-length guard) would never get detected, leaving the day
+  // marked complete indefinitely even though the UI still shows it missing.
+  const flattenMediaItems = (items: MediaItem[]): MediaItem[] =>
+    items.flatMap((item) => [
+      item,
+      ...(item.children?.length ? flattenMediaItems(item.children) : []),
+    ]);
+
+  const allMedia = flattenMediaItems(
+    Object.values(day.mediaSections ?? {}).flatMap(
+      (section) => section.items || [],
+    ),
   );
   const missingMediaCheckResults = await Promise.all(
     allMedia.map((media, mediaIndex) =>
@@ -1856,10 +1928,19 @@ export const clearMeetingCheckStatusPruneTimers = () => {
 };
 
 export const fetchMedia = async () => {
+  // Set synchronously (before the first await) so anything reacting to it -
+  // e.g. MediaCalendarPage's error/missing-media notifications and the
+  // per-day skeleton - sees "a refresh just started" immediately, rather
+  // than for however long it takes this function to actually reach the
+  // point of updating each day's real status. Without this, switching
+  // congregations (or any other fetchMedia() trigger) has a window where
+  // stale leftover status from before the refresh is still all that's
+  // available, and gets shown as if it were current.
+  const currentStateStore = useCurrentStateStore();
+  currentStateStore.mediaRefreshPending = true;
   try {
     if (isDemoMode) return;
 
-    const currentStateStore = useCurrentStateStore();
     if (
       !currentStateStore.currentCongregation ||
       !!currentStateStore.currentSettings?.disableMediaFetching
@@ -1948,6 +2029,16 @@ export const fetchMedia = async () => {
       currentStateStore.meetingCheckStatus[formatDate(day.date, 'YYYYMMDD')] =
         'checking';
     });
+    // Every day's fate is now determined: candidates are flagged 'checking'
+    // above, everything else was left exactly as it was. From here on,
+    // per-day meetingCheckStatus is the authoritative signal - this global
+    // flag only needed to cover the gap before that determination existed.
+    // Clearing it now (rather than waiting for the whole queue below,
+    // including downloads, to finish) matters because a day not part of
+    // meetingsToFetch (e.g. one that already has valid media) would
+    // otherwise sit under a skeleton for however long the OTHER days in this
+    // batch take to download, despite its own status already being settled.
+    currentStateStore.mediaRefreshPending = false;
     if (queues.meetings[currentStateStore.currentCongregation]) {
       queues.meetings[currentStateStore.currentCongregation]?.start();
     } else {
@@ -1992,6 +2083,8 @@ export const fetchMedia = async () => {
   } catch (error) {
     log('❌ Error in fetchMedia:', 'mediaFetching', 'error');
     errorCatcher(error);
+  } finally {
+    currentStateStore.mediaRefreshPending = false;
   }
 };
 
@@ -3212,6 +3305,10 @@ export const dynamicMediaMapper = async (
           cbs: item.cbs,
           children: [],
           extractCaption: item.extractCaption,
+          // Captured from this first child before it's overwritten below -
+          // this is the group's own paragraph-ordinal position among its
+          // siblings/other top-level items, used by the .sort() right after
+          // this reduce() and unrelated to the overwrite that follows.
           sortOrderOriginal: item.sortOrderOriginal,
           source: item.source,
           title: item.extractCaption,
@@ -3219,7 +3316,21 @@ export const dynamicMediaMapper = async (
           uniqueId: `group-${item.extractCaption}`,
         };
 
-        acc[item.extractCaption]?.children?.push(item);
+        // Every child sharing this extractCaption typically also shares the
+        // same BeginParagraphOrdinal (that's the granularity of the API
+        // field - it identifies a paragraph, not a specific piece of media
+        // within it), which is exactly why they got grouped together here
+        // in the first place. Left as-is, every child in a group would
+        // carry an identical (or otherwise non-distinguishing)
+        // sortOrderOriginal, making it useless for detecting/restoring this
+        // group's own child order (see HeaderCalendar's mediaSortCanBeReset/
+        // resetSort). Overwriting it with the child's position within this
+        // group is safe: once an item has an extractCaption it only ever
+        // exists as a child from here on, so nothing downstream expects its
+        // original paragraph-ordinal value.
+        const group = acc[item.extractCaption];
+        item.sortOrderOriginal = group?.children?.length ?? 0;
+        group?.children?.push(item);
         return acc;
       }, {}),
     ).sort((a, b) => {
@@ -3603,9 +3714,18 @@ const applyMepsLanguageOverrides = (
     docId: number;
     includeVideoMarkers?: boolean;
   },
+  // Language data sourced from databases other than `options.db` — e.g. the
+  // per-item databases opened while resolving nested extract media (see
+  // getDocumentExtractItems) — so media embedded inside a referenced
+  // publication can still be verified against the database it actually
+  // came from, not just the outer meeting document's own database.
+  extraMepsLanguagesByMediaItem: MepsLanguageByMediaItem[] = [],
 ) => {
   const currentStateStore = useCurrentStateStore();
-  const mepsLanguagesByMediaItem = getMepsLanguagesByMediaItem(options);
+  const mepsLanguagesByMediaItem = [
+    ...getMepsLanguagesByMediaItem(options),
+    ...extraMepsLanguagesByMediaItem,
+  ];
 
   for (const media of allMedia) {
     applyMepsLanguageOverride(media, mepsLanguagesByMediaItem);
@@ -3619,12 +3739,7 @@ const applyMepsLanguageOverrides = (
 
   function applyMepsLanguageOverride(
     media: MultimediaItem,
-    mepsLanguages: {
-      IssueTagNumber: number;
-      KeySymbol: null | string;
-      MepsLanguageIndex: number;
-      Track: null | number;
-    }[],
+    mepsLanguages: MepsLanguageByMediaItem[],
   ) {
     const mediaKeySymbol =
       media.KeySymbol === 'sjjm'
@@ -4215,7 +4330,10 @@ export const getMwMedia = async (
     //   },
     // );
 
-    const extracts = await getDocumentExtractItems(
+    const {
+      items: extracts,
+      mepsLanguagesByMediaItem: extractMepsLanguagesByMediaItem,
+    } = await getDocumentExtractItems(
       db,
       docId,
       formatDate(lookupDate, 'YYYYMMDD'),
@@ -4225,10 +4343,11 @@ export const getMwMedia = async (
       .concat(extracts)
       .sort((a, b) => a.BeginParagraphOrdinal - b.BeginParagraphOrdinal);
 
-    const mepsLanguagesByMediaItem = applyMepsLanguageOverrides(allMedia, {
-      db,
-      docId,
-    });
+    const mepsLanguagesByMediaItem = applyMepsLanguageOverrides(
+      allMedia,
+      { db, docId },
+      extractMepsLanguagesByMediaItem,
+    );
     const errors =
       (await processMissingMediaInfo({
         allMedia,
@@ -4284,14 +4403,7 @@ const mediaHasMepsLanguage = (
   effectiveMediaKeySymbol: null | string | undefined,
   mepsLanguageIndex: number | undefined,
   isSignLanguage: boolean,
-  mepsLanguagesByMediaItem:
-    | undefined
-    | {
-        IssueTagNumber: number;
-        KeySymbol: null | string;
-        MepsLanguageIndex: number;
-        Track: null | number;
-      }[],
+  mepsLanguagesByMediaItem: MepsLanguageByMediaItem[] | undefined,
 ) => {
   if (mepsLanguageIndex === undefined) return false;
   if (!isSignLanguage) return true;
@@ -4307,14 +4419,7 @@ const getMediaLanguageCandidates = (
   media: MultimediaItem,
   effectiveMediaKeySymbol: null | string | undefined,
   isSignLanguage: boolean,
-  mepsLanguagesByMediaItem:
-    | undefined
-    | {
-        IssueTagNumber: number;
-        KeySymbol: null | string;
-        MepsLanguageIndex: number;
-        Track: null | number;
-      }[],
+  mepsLanguagesByMediaItem: MepsLanguageByMediaItem[] | undefined,
 ) => {
   const currentStateStore = useCurrentStateStore();
   const mediaMepsLanguage =
@@ -4483,12 +4588,7 @@ export async function processMissingMediaInfo({
   isDynamicMedia?: boolean;
   keepMediaLabels?: boolean;
   meetingDate?: null | string;
-  mepsLanguagesByMediaItem?: {
-    IssueTagNumber: number;
-    KeySymbol: null | string;
-    MepsLanguageIndex: number;
-    Track: null | number;
-  }[];
+  mepsLanguagesByMediaItem?: MepsLanguageByMediaItem[];
 }) {
   try {
     const currentStateStore = useCurrentStateStore();
@@ -4701,11 +4801,30 @@ const findExistingPublicationFile = async (
   if (!(await pathExists(pubDir))) return { FilePath: '' };
 
   const dirItems = await readdir(pubDir);
+
+  // JW media filenames drop the trailing "00" day placeholder some issue
+  // tags carry (e.g. issue 20241000 downloads as "..._202410_...", never
+  // "..._20241000_..."), so match on that truncated form instead of the
+  // raw value.
+  const issueStr = publication.issue?.toString();
+  const issueParam =
+    issueStr?.endsWith('00') && issueStr.length > 2
+      ? issueStr.slice(0, -2)
+      : issueStr;
+
+  // Mirrors fetchPubMediaLinks' own docid-vs-pub priority (see api.ts): a
+  // real download only ever encodes ONE of the two in its filename - docid
+  // alone, or pub+issue+track, never both. createMissingMediaPublicationFetcher
+  // sets both on the same object regardless of which one the download
+  // actually ends up using, so requiring every one of them to match (as
+  // this used to) could never find a file that was actually fetched via
+  // the pub+issue+track fallback (e.g. sign-language media, see the docid
+  // priority fix in fetchPubMediaLinks).
   const params = [
-    publication.issue,
+    issueParam,
     publication.track,
     publication.pub,
-    publication.docid,
+    publication.pub ? undefined : publication.docid,
   ]
     .filter((item) => item !== undefined && item !== null)
     .map((item) => item.toString());

@@ -4,49 +4,58 @@
 
 Täielik nimekiri versioonide vahelistest muudatustest on esitatud failis CHANGELOG.md GitHubis.
 
+## v26.8.0
+
+### ✨ Uued funktsioonid
+
+- ✨ **App-Wide Redesign**: A broad visual and interaction refresh across dialogs, the media list/header, Settings, and the Setup Wizard. The Setup Wizard is now a one-question-per-screen flow with a progress bar. All prompts were replaced with a consistent branded dialog, and PDF page-range selection (for publication and drag-and-drop imports) now uses a thumbnail-grid picker instead of a free-text prompt. Added a new Quick Start Guide tour after the Setup Wizard completes. Also includes refreshed card/header styling with dark-mode-aware shadows and several dark-mode contrast fixes (focused field labels, download-progress percentages).
+- ✨ **Settings Page**: Reworked into a two-pane layout, with a new global Preferences section for auto-update/beta-update toggles moved out of the About dialog (which is now purely informational).
+- ✨ **Add More Media Button**: Added a setting to choose exactly which meeting sections show the "add more media" shortcut button, along with a setting for a compact (icon-only) mode.
+- ✨ **Media List**: Items now show loading skeletons while being added instead of appearing empty, media groups show a hidden-item count in their badge (e.g. "9 items (2 hidden)"), children within a group can be reordered via drag-and-drop, and at very narrow window widths items collapse into compact, tooltip-carrying chips instead of crowding the row.
+
 ## v26.7.7
 
 ### ✨ Uued funktsioonid
 
-- ✨ **Media Preview Quality**: Media preview now renders video frames via canvas with high-quality downscaling, fixing jagged/blurry previews (especially on text-heavy content like songs). The preview also auto-disables itself if it has to repeatedly correct playback drift on a single video, with a one-click way to turn it back on.
+- ✨ **Meediaeelvaate kvaliteet**: Meediaeelvaade kuvab videokaadreid, kasutades kõrgekvaliteedilist vähendamist, mis kõrvaldab ebaühtlased ja udused eelvaated (eriti tekstirohke sisu puhul, nagu laulud). Eelvaade lülitub ka automaatselt välja, kui see peab ühe video puhul korduvalt korrigeerima taasesituse nihkeid, kuid seda saab ühe klõpsuga uuesti sisse lülitada.
 
 ## v26.7.6
 
 ### ✨ Uued funktsioonid
 
-- ✨ **CBS Video Exclusion**: Added a setting to exclude Congregation Bible Study videos from specific publications (defaults to the **Walk Courageously With God** book), with a searchable publication picker.
-- ✨ **Document Page Numbers**: Publication Media and JWPUB import listings now show each document's page number (or numbers when there are multiple pages) after its title. This can help you to quickly find specific media when you know the page number on which it is found.
+- ✨ **Koguduse piibliuurimise videote välistamine**: Lisati seade, mis võimaldab välistada koguduse piibliuurimise videod teatud väljaannetest (vaikimisi on valitud raamat **Julgelt koos Jumalaga**), koos otsingufunktsiooniga väljaannete valikuga.
+- ✨ **Dokumendi leheküljenumbrid**: Väljaannete jaotises ja JWPUB-i imporditud nimekirjades kuvatakse nüüd iga dokumendi pealkirja järel selle leheküljenumber (või numbrid, kui dokumendil on mitu lehekülge). See aitab sul kiiresti leida konkreetset meediat, kui tead leheküljenumbrit, millel see asub.
 
 ## v26.7.4
 
 ### ✨ Uued funktsioonid
 
-- ✨ **Missing Media Recovery**: Media items whose local file went missing (e.g. deleted by the cache auto-clear, or removed manually) now show a disabled play button, a "missing" caption naming the file to look for, and a new "Locate file" action to relink the item to a file on disk.
-- ✨ **Compatibility Warning**: Added a dismissible banner warning users on soon-to-be-unsupported OS/architecture combos (macOS 12 Monterey and Windows 32-bit) to upgrade before future app updates require newer system support.
+- ✨ **Puuduva meedia taastamine**: Meediaelementidel, mille kohalik fail on puudu (nt kustutatud vahemälu automaatse tühjendamise käigus või käsitsi eemaldatud), kuvatakse nüüd keelatud esitusnupp, märge „kadunud”, milles on nimetatud otsitav fail, ning uus tegevus „Leia fail”, mille abil saab elemendi uuesti seostada kettal oleva failiga.
+- ✨ **Ühilduvushoiatus**: Lisati sulgev bänner, mis hoiatab kasutajaid peagi toetamata jäävatest operatsioonisüsteemi ja arhitektuuri kombinatsioonidest (macOS 12 Monterey ja Windows 32-bit), et nad saaksid uuendada enne, kui tulevased rakenduse värskendused nõuavad uuemat süsteemi toetust.
 
 ## v26.7.0
 
 ### ✨ Uued funktsioonid
 
-- ✨ **Linked Audio Playback**: Added support for playing audio from one file together with video from another file. This can be useful for playing video slideshows with accompanying music.
-- ✨ **Watched Media Layouts**: Added persistence for watched media items and section order across watched folders. This ensures that the media list is displayed the same way even when the watched folder is synced across devices.
+- ✨ **Seotud heliesitus**: Lisati tugi ühe faili heli ja teise faili video üheaegseks esitamiseks. See võib olla kasulik muusikaga saadetud slaidide esitamisel.
+- ✨ **Vaadatud meedia paigutused**: Lisati vaadatud meediaelementide ja jaotiste järjekorra salvestamine vaadatud kaustade vahel. See tagab, et meedianimekiri kuvatakse ühtmoodi ka siis, kui jälgitav kaust sünkroonitakse eri seadmete vahel.
 
 ## v26.6.1
 
 ### ✨ Uued funktsioonid
 
-- ✨ **Media Preview**: Added a live media preview overlay that can be toggled on or off from the settings or from the display popup.
-- ✨ **Search media**: Added a quick search box in the media list that allows you to quickly find media by title. To use it, simply use the standard keyboard shortcut for search (Ctrl+F or Cmd+F).
-- ✨ **Filter settings**: Added a filter box to the settings page that allows you to find settings by keyword or category. To use it, simply click on the Search button in the top right corner of the settings page, or use the standard keyboard shortcut for search (Ctrl+F or Cmd+F).
-- ✨ **Background Music Overlap Warning**: Added a warning notification when media is started while background music is playing. Users can choose to stop the background music from the notification.
+- ✨ **Meediaeelvaade**: Lisati reaalajas töötav meediaeelvaate kiht, mida saab sisse ja välja lülitada seadete menüüs või ekraanil kuvatavas hüpikaknas.
+- ✨ **Meedia otsimine**: Meedia nimekirja on lisatud kiirotsingukast, mis võimaldab meediat pealkirja järgi kiiresti üles leida. Selle kasutamiseks piisab, kui kasutada otsingu jaoks tavapärast klahvikombinatsiooni (Ctrl+F või Cmd+F).
+- ✨ **Seadete filtreerimine**: Seadete lehele on lisatud filtri lahter, mis võimaldab seadeid otsida märksõna või kategooria järgi. Selle kasutamiseks klõpsake lihtsalt seadete lehe paremas ülemises nurgas asuvat otsingunuppu või kasutage otsinguks tavapärast klahvikombinatsiooni (Ctrl+F või Cmd+F). See võimaldab teil leida seadeid märksõna või kategooria järgi.
+- ✨ **Hoiatus taustamuusika kattumise kohta**: Lisati hoiatus, kui meedia käivitatakse ajal, mil taustamuusika juba mängib. Kasutajad saavad teate kaudu taustamuusika peatada.
 
 ## v26.6.0
 
 ### ✨ Uued funktsioonid
 
-- ✨ **Timer**: Added analog display modes and timing report status.
-- ✨ **Profiles**: Added profile settings import and export in Advanced settings and the Setup Wizard.
-- ✨ **Media Window**: Added support for automatically hiding the media window after playback when it was initially hidden. This is practical when a remote speaker wants to display images, for example.
+- ✨ **Taimer**: Lisati analoogkuva režiimid ja ajastamise aruande staatus.
+- ✨ **Profiilid**: Lisati profiili seadete import ja eksport täpsemates seadetes ja seadistusviisardis.
+- ✨ **Meediaaken**: Lisati tugi meediaakna automaatseks peitmiseks pärast taasesitust, kui see oli algselt peidetud. See on kasulik näiteks siis, kui kaugjuhtimispulti kasutav esineja soovib pilte näidata.
 
 ## v26.5.0
 
@@ -251,22 +260,22 @@ Täielik nimekiri versioonide vahelistest muudatustest on esitatud failis CHANGE
 
 ### ✨ Uued funktsioonid
 
-- **feat**: Presenting the website is now supported on macOS 🚀
-- **feat**: Introduced keyboard shortcuts for stopping, pausing, and resuming media playback 🚀
-- **feat**: Added support for setting the web address from which media should be downloaded 🚀
-- **feat**: Added OBS Studio instant scene picker and overhauled scene picker functionality in settings
-- **feat**: Expanded documentation website to support more languages
+- 🖥️ **Website Presentation on macOS**: Presenting the website is now supported on macOS 🚀
+- ⌨️ **Playback Keyboard Shortcuts**: Introduced keyboard shortcuts for stopping, pausing, and resuming media playback 🚀
+- 🌐 **Custom Media Download Address**: Added support for setting the web address from which media should be downloaded 🚀
+- 🎬 **OBS Instant Scene Picker**: Added OBS Studio instant scene picker and overhauled scene picker functionality in settings
+- 📖 **More Documentation Languages**: Expanded documentation website to support more languages
 
 ## 24.10.10
 
 ### ✨ Uued funktsioonid
 
-- **new**: Added keyboard shortcuts to navigate to the next/previous media item
-- **new**: Added a right-click menu to media items to hide media items and rename them
-- **new**: Trimmed video times are now respected in imported JWL playlists
+- ⌨️ **Media Navigation Shortcuts**: Added keyboard shortcuts to navigate to the next/previous media item
+- 🖱️ **Media Item Right-Click Menu**: Added a right-click menu to media items to hide media items and rename them
+- ✂️ **Trimmed JWL Playlist Import**: Trimmed video times are now respected in imported JWL playlists
 
 ## 24.10.9
 
 ### ✨ Uued funktsioonid
 
-- **feat**: Added an option to delete all extra media files for the currently selected day
+- 🗑️ **Delete Extra Media for a Day**: Added an option to delete all extra media files for the currently selected day

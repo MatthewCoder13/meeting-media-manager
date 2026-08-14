@@ -13,11 +13,21 @@ import { Buffer } from 'buffer'; // NOSONAR: this is not nodejs Buffer, it's the
 import { Platform } from 'quasar';
 import { FULL_HD } from 'src/constants/media';
 import { errorCatcher } from 'src/helpers/error-catcher';
+import { getFilesystemErrorCode } from 'src/shared/filesystem-errors';
 import { fetchJson } from 'src/utils/api';
 import { getCachedUserDataPath, getPublicationDirectory } from 'src/utils/fs';
 import { isAudio, isImage, isVideo } from 'src/utils/media';
 import { useCurrentStateStore } from 'stores/current-state';
 import { useJwStore } from 'stores/jw';
+
+// Node's `process.platform` doesn't exist in the renderer - map Quasar's
+// Electron-provided OS detection to the same values so renderer code can
+// call the shared filesystem-error helpers in src/shared/filesystem-errors.
+export const getRendererPlatform = (): NodeJS.Platform => {
+  if (Platform.is.win) return 'win32';
+  if (Platform.is.mac) return 'darwin';
+  return 'linux';
+};
 
 let downloadFileIfNeededProvider:
   ((options: FileDownloader) => Promise<DownloadedFile>) | null = null;
@@ -61,11 +71,52 @@ const {
   pathToFileURL,
   readdir,
   resolve,
+  setExecutable,
   unwatchFolders,
   unzip,
   watchFolder,
 } = globalThis.electronApi;
 const { pathExists, stat, writeFile } = fs;
+
+const THUMBNAIL_WRITE_RETRY_COUNT = 3;
+const THUMBNAIL_WRITE_RETRY_DELAY_MS = 250;
+const THUMBNAIL_WRITE_RETRYABLE_CODES = new Set(['EBUSY', 'EPERM']);
+
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/**
+ * Writes a freshly-captured video-frame thumbnail next to its source video,
+ * retrying a few times on EBUSY/EPERM. On Windows those codes commonly show
+ * up as a transient lock on a file that just landed in the folder (AV
+ * real-time scan, search indexer, ...) rather than a real permission
+ * problem - a short retry gives that lock a chance to clear before we give
+ * up and report it.
+ */
+const writeThumbnailFile = async (thumbnailPath: string, imageData: Buffer) => {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= THUMBNAIL_WRITE_RETRY_COUNT; attempt++) {
+    try {
+      await writeFile(thumbnailPath, imageData);
+      return;
+    } catch (error) {
+      lastError = error;
+      const code = getFilesystemErrorCode(error);
+      if (
+        attempt === THUMBNAIL_WRITE_RETRY_COUNT ||
+        !THUMBNAIL_WRITE_RETRYABLE_CODES.has(code ?? '')
+      ) {
+        throw error;
+      }
+      await delay(THUMBNAIL_WRITE_RETRY_DELAY_MS * (attempt + 1));
+    }
+  }
+
+  throw lastError;
+};
 
 const withCacheBust = (url: string, forceRefresh?: boolean) => {
   if (!url || !forceRefresh) return url;
@@ -73,7 +124,14 @@ const withCacheBust = (url: string, forceRefresh?: boolean) => {
   return `${url}${separator}timestamp=${Date.now()}`;
 };
 
-const getThumbnailFromMetadata = async (mediaPath: string) => {
+const getThumbnailFromMetadata = async (
+  mediaPath: string,
+  // The video-thumbnail path calls this as a first attempt and falls back
+  // to grabbing a frame from the <video> element, so a failure here isn't
+  // yet a real problem worth reporting - only report when this is the only
+  // attempt being made (e.g. for audio files, which have no such fallback).
+  report = true,
+) => {
   try {
     mediaPath = fileUrlToPath(mediaPath);
     if (!mediaPath || !(await pathExists(mediaPath))) return '';
@@ -110,7 +168,7 @@ const getThumbnailFromMetadata = async (mediaPath: string) => {
       return '';
     }
   } catch (error) {
-    if (!mediaPath?.toLowerCase().endsWith('.mov')) {
+    if (report && !mediaPath?.toLowerCase().endsWith('.mov')) {
       errorCatcher(error, {
         contexts: { fn: { mediaPath, name: 'getThumbnailFromMetadata' } },
       });
@@ -175,7 +233,7 @@ const getThumbnailFromVideoPath = async (
     throw new Error(`Video file does not exist: ${videoPath}`);
   }
 
-  const url = await getThumbnailFromMetadata(videoFileUrl);
+  const url = await getThumbnailFromMetadata(videoFileUrl, false);
   if (url) {
     return url;
   }
@@ -217,7 +275,7 @@ const getThumbnailFromVideoPath = async (
       !watchDir ||
       !dirname(thumbnailPath).startsWith(watchDir)
     ) {
-      await writeFile(thumbnailPath, imageData);
+      await writeThumbnailFile(thumbnailPath, imageData);
       return thumbnailPath;
     } else {
       return blobUrl;
@@ -363,18 +421,31 @@ export const setupFFmpeg = async (): Promise<string> => {
     const ffmpegDir = await getFFmpegDirectory();
     const ffmpegZipPath = join(ffmpegDir, version.name);
 
+    let ffmpegPath: string;
     if (await validateExistingFile(ffmpegZipPath, version.size, ffmpegDir)) {
-      return currentState.ffmpegPath;
+      ffmpegPath = currentState.ffmpegPath;
+    } else {
+      const resolvedFfmpegDir = await downloadFfmpeg(
+        version.browser_download_url,
+        ffmpegDir,
+      );
+      ffmpegPath = await unzipAndFindFFmpeg(
+        join(resolvedFfmpegDir, version.name),
+        resolvedFfmpegDir,
+      );
     }
 
-    const resolvedFfmpegDir = await downloadFfmpeg(
-      version.browser_download_url,
-      ffmpegDir,
-    );
-    const ffmpegPath = await unzipAndFindFFmpeg(
-      join(resolvedFfmpegDir, version.name),
-      resolvedFfmpegDir,
-    );
+    // Unzipping does not carry permissions across, so the binary arrives without
+    // its executable bit and cannot be spawned on macOS or Linux. Both branches
+    // above funnel through here, including the one that reuses an
+    // already-downloaded copy, so an install left broken by an earlier version
+    // repairs itself on the next run rather than needing a fresh download.
+    if (!(await setExecutable(ffmpegPath))) {
+      // Leaving the path in the store would have the early return above hand out
+      // an unusable binary for the rest of the session.
+      currentState.ffmpegPath = '';
+      return '';
+    }
 
     currentState.ffmpegPath = ffmpegPath;
     return ffmpegPath;

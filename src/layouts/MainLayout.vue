@@ -6,6 +6,8 @@
     <!-- Side navigation -->
     <NavDrawer v-model="miniState" />
 
+    <DialogCongregationSwitcher />
+
     <!-- Main content -->
     <q-page-container class="app-main-scroll main-bg">
       <AnnouncementBanner />
@@ -27,6 +29,24 @@
     >
       <ActionIsland />
     </q-footer>
+
+    <ConfirmDialog
+      v-model="macosPermissionPromptOpen"
+      :confirm-label="t('choose-a-folder')"
+      dialog-id="macos-folder-permission-prompt"
+      icon="mmm-folder-open"
+      icon-color="primary"
+      :message="
+        t('macos-folder-permission-message', {
+          folder: macosPermissionPromptTarget?.label,
+          path: macosPermissionPromptTarget?.path,
+        })
+      "
+      persistent
+      :title="t('macos-folder-permission-title')"
+      @cancel="cancelMacosPermission"
+      @confirm="confirmMacosPermission"
+    />
   </q-layout>
 </template>
 
@@ -50,6 +70,8 @@ import {
   whenever,
 } from '@vueuse/core';
 import { queues } from 'boot/globals';
+import ConfirmDialog from 'components/dialog/ConfirmDialog.vue';
+import DialogCongregationSwitcher from 'components/dialog/DialogCongregationSwitcher.vue';
 import HeaderBase from 'components/header/HeaderBase.vue';
 import MediaPreview from 'components/media/MediaPreview.vue';
 import ActionIsland from 'components/ui/ActionIsland.vue';
@@ -107,7 +129,7 @@ import { formatDate, getSpecificWeekday, isInPast } from 'src/utils/date';
 import { kebabToCamelCase } from 'src/utils/general';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRoute, useRouter } from 'vue-router';
+import { useRouter } from 'vue-router';
 
 // Local state
 const miniState = ref(true);
@@ -143,7 +165,6 @@ $q.iconMapFn = (iconName) => {
 };
 
 // Routes and translations
-const route = useRoute();
 const router = useRouter();
 const { locale, t } = useI18n({ useScope: 'global' });
 
@@ -209,6 +230,7 @@ updateJwLanguages(online.value);
 const hasActiveDownloads = () => currentState.hasActiveMediaWork;
 
 let cacheClearTriggered = false;
+let dismissUpdatesDisabledNotification: (() => void) | undefined;
 const macosFolderPermissionPrompts = new Set<string>();
 
 type MacosFolderPermissionSetting = Extract<
@@ -287,27 +309,33 @@ const getMacosFolderPermissionTargets = () => {
   return targets;
 };
 
+const macosPermissionPromptOpen = ref(false);
+const macosPermissionPromptTarget = ref<MacosFolderPermissionTarget | null>(
+  null,
+);
+let resolveMacosPermissionPrompt: ((value: boolean) => void) | null = null;
+
 const confirmMacosFolderPermissionPrompt = (
   target: MacosFolderPermissionTarget,
-) =>
-  new Promise<boolean>((resolve) => {
-    $q.dialog({
-      cancel: true,
-      message: t('macos-folder-permission-message', {
-        folder: target.label,
-        path: target.path,
-      }),
-      ok: {
-        color: 'primary',
-        label: t('choose-a-folder'),
-      },
-      persistent: true,
-      title: t('macos-folder-permission-title'),
-    })
-      .onOk(() => resolve(true))
-      .onCancel(() => resolve(false))
-      .onDismiss(() => resolve(false));
+) => {
+  macosPermissionPromptTarget.value = target;
+  macosPermissionPromptOpen.value = true;
+  return new Promise<boolean>((resolve) => {
+    resolveMacosPermissionPrompt = resolve;
   });
+};
+
+const confirmMacosPermission = () => {
+  macosPermissionPromptOpen.value = false;
+  resolveMacosPermissionPrompt?.(true);
+  resolveMacosPermissionPrompt = null;
+};
+
+const cancelMacosPermission = () => {
+  macosPermissionPromptOpen.value = false;
+  resolveMacosPermissionPrompt?.(false);
+  resolveMacosPermissionPrompt = null;
+};
 
 const checkMacosFolderPermission = async (
   target: MacosFolderPermissionTarget,
@@ -410,12 +438,10 @@ const delayedCacheClear = () => {
   setTimeout(checkAndClear, 30000);
 };
 
-const navigateToCongregationSelector = () => {
+const showCongregationSwitcher = (opts?: { isBootstrap?: boolean }) => {
   try {
-    if (!route.fullPath.includes('/congregation-selector')) {
-      router.push({ path: '/congregation-selector' });
-      selectedDate.value = '';
-    }
+    currentState.openCongregationSwitcher(opts);
+    selectedDate.value = '';
   } catch (error) {
     errorCatcher(error);
   }
@@ -1021,15 +1047,38 @@ const { post: postHideMediaLogo } = useBroadcastChannel<
   name: 'hide-media-logo',
 }); // Send hideMediaLogo to the media player page using useBroadcastChannel
 
+const { post: postObsEnabled } = useBroadcastChannel<
+  boolean | undefined,
+  boolean | undefined
+>({
+  name: 'obs-enabled',
+}); // Send obsEnable to the media player page using useBroadcastChannel
+
+const handleAutoUpdatesToggled = (event: Event) => {
+  if (!(event as CustomEvent<boolean>).detail) return;
+  dismissUpdatesDisabledNotification?.();
+  dismissUpdatesDisabledNotification = undefined;
+};
+
 onMounted(() => {
   void cleanTempPathOnStartup();
   congregationSettings.updateCongregationsWithMissingSettings();
-  if (!currentSettings.value) navigateToCongregationSelector();
+  // Guard against clobbering a bootstrap open already triggered by
+  // RouteHelper (fresh launch) before this component even mounted - only
+  // open it here (as a plain, non-bootstrap open) if nothing already did.
+  if (!currentSettings.value && !currentState.congregationSwitcherOpen) {
+    showCongregationSwitcher();
+  }
   initListeners();
+  globalThis.addEventListener('autoUpdatesToggled', handleAutoUpdatesToggled);
 });
 
 onBeforeUnmount(() => {
   removeListenersLocal();
+  globalThis.removeEventListener(
+    'autoUpdatesToggled',
+    handleAutoUpdatesToggled,
+  );
 });
 
 watchImmediate(
@@ -1069,6 +1118,13 @@ watchImmediate(
   () => currentSettings.value?.hideMediaLogo,
   (newHideMediaLogo) => {
     postHideMediaLogo(newHideMediaLogo);
+  },
+);
+
+watchImmediate(
+  () => currentSettings.value?.obsEnable,
+  (newObsEnable) => {
+    postObsEnabled(newObsEnable);
   },
 );
 
@@ -1145,6 +1201,7 @@ watchImmediate(
     });
     postOnline(online.value);
     postHideMediaLogo(currentSettings.value?.hideMediaLogo);
+    postObsEnabled(currentSettings.value?.obsEnable);
     if (!yeartextWatcherPaused.value) {
       postYeartext(yeartext.value);
     }
@@ -1169,7 +1226,7 @@ watch(currentCongregation, async (newCongregation, oldCongregation) => {
       toggleMediaWindowVisibility(false);
       toggleTimerWindow(false);
       currentState.setTimerWindowVisible(false);
-      navigateToCongregationSelector();
+      showCongregationSwitcher();
       return; // exit early — no need to run notifications
     }
 
@@ -1246,12 +1303,23 @@ watch(currentCongregation, async (newCongregation, oldCongregation) => {
     // Priority: beta warning first
     if (isBetaVersion) {
       createTemporaryNotification({
+        deferWhileDialogOpen: true,
         message: t('beta-version-warning'),
         timeout: 30000,
         type: 'warning',
       });
     } else if (areUpdatesDisabled) {
-      createTemporaryNotification({
+      dismissUpdatesDisabledNotification = createTemporaryNotification({
+        actions: [
+          {
+            color: 'white',
+            handler: () => {
+              router.push('/settings/autoUpdateApp');
+            },
+            label: t('go-to-settings'),
+          },
+        ],
+        deferWhileDialogOpen: true,
         message: t('updates-disabled-warning'),
         timeout: 10000,
         type: 'info',
@@ -1260,6 +1328,7 @@ watch(currentCongregation, async (newCongregation, oldCongregation) => {
     if (hasArchitectureMismatch) {
       createTemporaryNotification({
         caption: t('architecture-mismatch-explain'),
+        deferWhileDialogOpen: true,
         message: t('architecture-mismatch'),
         timeout: 30000,
         type: 'info',
@@ -1309,6 +1378,7 @@ watch(
       // Automatic sync is now disabled for this congregation
       createTemporaryNotification({
         caption: t('automatic-sync-disabled-explain'),
+        deferWhileDialogOpen: true,
         message: t('automatic-sync-disabled'),
         timeout: 10000,
         type: 'warning',
@@ -1316,6 +1386,7 @@ watch(
     } else if (!newCongregationNameModified && oldCongregationNameModified) {
       // Automatic sync is now enabled for this congregation
       createTemporaryNotification({
+        deferWhileDialogOpen: true,
         message: t('automatic-sync-enabled'),
         timeout: 10000,
         type: 'positive',
@@ -1358,7 +1429,7 @@ watch(online, (isNowOnline) => {
 });
 
 watch(currentSettings, (newSettings) => {
-  if (!newSettings) navigateToCongregationSelector();
+  if (!newSettings) showCongregationSwitcher();
 });
 
 watchImmediate(
@@ -1592,6 +1663,8 @@ watch(
   },
 );
 
+let dismissHardwareAccelerationDisabledNotification: (() => void) | undefined;
+
 watchImmediate(
   () => currentSettings.value?.disableHardwareAcceleration,
   (newDisableHardwareAcceleration) => {
@@ -1602,21 +1675,27 @@ watchImmediate(
         newDisableHardwareAcceleration &&
         !currentSettings.value?.suppressHardwareAccelerationReminder
       ) {
-        createTemporaryNotification({
-          actions: [
-            {
-              color: 'white',
-              handler: () => {
-                router.push('/settings/disableHardwareAcceleration');
+        dismissHardwareAccelerationDisabledNotification =
+          createTemporaryNotification({
+            actions: [
+              {
+                color: 'white',
+                handler: () => {
+                  router.push('/settings/disableHardwareAcceleration');
+                },
+                label: t('go-to-settings'),
               },
-              label: t('go-to-settings'),
-            },
-          ],
-          caption: t('hardwareAccelerationDisabledExplain'),
-          message: t('hardwareAccelerationDisabled'),
-          timeout: 10000,
-          type: 'info',
-        });
+            ],
+            caption: t('hardwareAccelerationDisabledExplain'),
+            message: t('hardwareAccelerationDisabled'),
+            timeout: 10000,
+            type: 'info',
+          });
+      } else {
+        // The user re-enabled hardware acceleration; the reminder no longer
+        // applies, so dismiss it instead of leaving it to expire on its own.
+        dismissHardwareAccelerationDisabledNotification?.();
+        dismissHardwareAccelerationDisabledNotification = undefined;
       }
     }
   },

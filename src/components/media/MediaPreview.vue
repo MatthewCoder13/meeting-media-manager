@@ -25,19 +25,29 @@
       @pointerdown="startDrag"
     >
       <span v-if="modalOpen" class="media-preview-close">
-        <q-icon name="close" size="sm" />
+        <q-icon name="mmm-clear" size="sm" />
         <q-tooltip :delay="1000">{{ t('close') }}</q-tooltip>
       </span>
       <div class="media-preview-surface">
         <img
-          v-if="imagePreview"
+          v-if="imagePreview && !imageLoadError"
           alt=""
           class="media-preview-content"
           draggable="false"
           :src="currentUrl"
           :style="imageStyle"
           @dragstart.prevent.stop
+          @error="imageLoadError = true"
         />
+        <div
+          v-else-if="imagePreview && imageLoadError"
+          class="media-preview-content media-preview-broken column items-center justify-center"
+        >
+          <q-icon color="grey" name="mmm-image-broken" size="2em" />
+          <div class="text-caption q-mt-sm">
+            {{ t('unable-to-load-image') }}
+          </div>
+        </div>
         <template v-else>
           <video
             ref="previewVideo"
@@ -96,7 +106,7 @@
 </template>
 
 <script setup lang="ts">
-import { useDebounceFn, useEventListener } from '@vueuse/core';
+import { useDebounceFn, useEventListener, useThrottleFn } from '@vueuse/core';
 import { storeToRefs } from 'pinia';
 import { errorCatcher } from 'src/helpers/error-catcher';
 import { createTemporaryNotification } from 'src/helpers/notifications';
@@ -157,6 +167,7 @@ const suppressNextClick = ref(false);
 
 const currentUrl = computed(() => mediaPlaying.value.url);
 const imagePreview = computed(() => isImage(currentUrl.value));
+const imageLoadError = ref(false);
 const mediaAction = computed(() => mediaPlaying.value.action);
 // playbackConfirmedToken only catches up to playToken once the media
 // window's reported position has actually been observed advancing (see
@@ -330,8 +341,15 @@ const syncVideoTime = (element: HTMLVideoElement, acceptableDrift: number) => {
 // sustained inability to keep up rather than a raw lifetime count (which a
 // long enough video would eventually trip even with correction attempts
 // spread harmlessly far apart).
+//
+// syncVideos (and thus each drift check) is throttled to roughly once every
+// 5s during steady live playback (see throttledSyncVideos below), so a
+// window needs to be long enough to accumulate several check opportunities
+// - otherwise "5 corrections" would require nearly every single check to
+// fail. At 60s, that's ~12 checks, so 5 corrections is a real sustained
+// pattern (~40% of checks) without demanding near-constant failure.
 const DRIFT_CORRECTIONS_BEFORE_AUTO_DISABLE = 5;
-const DRIFT_CORRECTION_WINDOW_SECONDS = 30;
+const DRIFT_CORRECTION_WINDOW_SECONDS = 60;
 const recentDriftCorrections = ref<number[]>([]);
 
 const disablePreviewForPerformance = () => {
@@ -413,8 +431,14 @@ const syncVideos = async () => {
     }
 
     if (mediaAction.value !== 'play') {
-      log('Pausing video preview', 'mediaPreview');
-      element.pause();
+      if (!element.paused) {
+        // Only pause if the video preview is playing. If it is already paused,
+        // do nothing. This prevents the video from being paused unnecessarily.
+        log('Pausing video preview', 'mediaPreview');
+        element.pause();
+      }
+
+      // Sync the video time to the media window position
       syncVideoTime(element, 0);
       if (isCanvasMode.value) drawCurrentFrame();
       return;
@@ -475,6 +499,16 @@ const syncVideos = async () => {
     reportPreviewError(error, 'MediaPreview.syncVideos');
   }
 };
+
+// mediaPlaying.currentPosition ticks roughly every 300ms while media is
+// actually playing (see the currentTimeData watcher in
+// MediaCalendarPage.vue), which is far more often than a drift check needs
+// to run. Throttle those routine ticks so steady, live playback only
+// re-syncs a few times a minute; real transitions (source swap, play/pause,
+// modal toggle, playback confirmation) bypass this and still resync
+// immediately via the watcher below. A paused scrub also bypasses this - see
+// that watcher for why.
+const throttledSyncVideos = useThrottleFn(syncVideos, 5000);
 
 const closeModalWhenHidden = () => {
   if (!showPreview.value) modalOpen.value = false;
@@ -860,7 +894,6 @@ watch(
   () => [
     currentUrl.value,
     mediaAction.value,
-    mediaPlaying.value.currentPosition,
     modalOpen.value,
     realPlaybackConfirmed.value,
   ],
@@ -869,8 +902,26 @@ watch(
   },
 );
 
+watch(
+  () => mediaPlaying.value.currentPosition,
+  () => {
+    // Throttling only makes sense for the steady stream of ticks during
+    // live playback. While paused, a currentPosition change is a deliberate
+    // scrub and should be reflected right away, not sit unapplied for up to
+    // 5s. (syncVideos itself doesn't register a drift correction in this
+    // case anyway - see the mediaAction.value !== 'play' branch above - so
+    // calling it directly here doesn't affect the auto-disable count either.)
+    if (mediaAction.value !== 'play') {
+      syncVideos();
+    } else {
+      throttledSyncVideos();
+    }
+  },
+);
+
 watch(currentUrl, () => {
   recentDriftCorrections.value = [];
+  imageLoadError.value = false;
 });
 
 watch(
@@ -1108,6 +1159,13 @@ watch(
   height: 100%;
   object-fit: contain;
   transform-origin: center;
+}
+
+.media-preview-broken {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: center;
 }
 
 .media-preview-content--source {

@@ -29,9 +29,10 @@
       @update-label="updateSectionLabel"
     />
     <!-- Empty State -->
-    <SectionEmptyState
-      v-if="isEmpty || someItemsAreHidden"
+    <EmptyState
+      v-if="(isEmpty || someItemsAreHidden) && !pendingImportCount"
       :all-items-are-hidden="allItemsAreHidden"
+      compact
       :is-dragging="isDragging"
       :selected-date="selectedDateObject"
       :some-items-are-hidden="someItemsAreHidden"
@@ -45,11 +46,17 @@
         :class="{ 'drop-here': isDragging }"
         :data-list="mediaList.config?.uniqueId"
       >
+        <!-- Skeleton placeholders for add-media operations still in flight -->
+        <MediaItemSkeleton
+          v-for="n in pendingImportCount"
+          :key="`pending-import-skeleton-${n}`"
+        />
         <template v-for="element in sortableItems" :key="element.uniqueId">
           <!-- Render dividers -->
           <MediaDivider
             v-if="element.type === 'divider'"
             :divider="element as any"
+            :is-dragging="isDragging"
             @delete="handleDeleteDivider"
             @update:color="
               (bgColor, textColor) =>
@@ -64,6 +71,7 @@
             v-else-if="element.children"
             :element="element"
             :expanded="expandedGroups[element.uniqueId] ?? false"
+            :is-dragging="isDragging"
             :media-filter-terms="mediaFilterTerms"
             :selected="selectedMediaItems?.includes(element.uniqueId)"
             :selected-media-items="selectedMediaItems"
@@ -76,8 +84,14 @@
                 })
             "
             @update:child-hidden="
-              element.children?.forEach((child) => (child.hidden = !!$event))
+              (hidden, childUniqueId) => {
+                const child = element.children?.find(
+                  (c) => c.uniqueId === childUniqueId,
+                );
+                if (child) child.hidden = !!hidden;
+              }
             "
+            @update:children-order="element.children = $event"
             @update:expanded="expandedGroups[element.uniqueId] = $event"
             @update:hidden="element.hidden = !!$event"
           />
@@ -85,6 +99,7 @@
           <MediaItem
             v-else
             v-model:repeat="element.repeat"
+            :is-dragging="isDragging"
             :media="element"
             :media-filter-terms="mediaFilterTerms"
             :selected="selectedMediaItems?.includes(element.uniqueId)"
@@ -139,11 +154,12 @@ import {
 import { useCurrentStateStore } from 'stores/current-state';
 import { computed, nextTick, ref, watch } from 'vue';
 
+import EmptyState from './EmptyState.vue';
 import MediaDivider from './MediaDivider.vue';
 import MediaGroup from './MediaGroup.vue';
 import MediaItem from './MediaItem.vue';
+import MediaItemSkeleton from './MediaItemSkeleton.vue';
 import MediaSectionHeader from './MediaSectionHeader.vue';
-import SectionEmptyState from './SectionEmptyState.vue';
 
 const props = defineProps<{
   mediaFilterTerms?: string[];
@@ -153,7 +169,18 @@ const props = defineProps<{
 }>();
 
 const currentState = useCurrentStateStore();
-const { selectedDateObject } = storeToRefs(currentState);
+const { pendingSectionImports, selectedDateObject } = storeToRefs(currentState);
+
+// Number of add-media operations currently in flight for this section - see
+// the `pendingSectionImports` doc comment in the current-state store. Shown
+// as skeleton placeholders below to bridge the gap before the real item
+// appears.
+const pendingImportCount = computed(
+  () =>
+    pendingSectionImports.value.filter(
+      (sectionId) => sectionId === props.mediaList.config?.uniqueId,
+    ).length,
+);
 
 // Ref to the section header
 const sectionHeaderRef = ref<InstanceType<typeof MediaSectionHeader> | null>(

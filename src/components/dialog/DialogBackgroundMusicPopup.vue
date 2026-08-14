@@ -158,6 +158,18 @@ import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 
+// <audio>.play() rejects with these when interrupted by something the app
+// itself just did (pausing, loading a new source, removing the element) -
+// expected noise, not a real playback failure worth reporting.
+const IGNORABLE_PLAYBACK_ERROR_MESSAGES = [
+  'removed from the document',
+  'new load request',
+  'interrupted by a call to pause',
+];
+const isIgnorablePlaybackError = (message?: null | string) =>
+  !!message &&
+  IGNORABLE_PLAYBACK_ERROR_MESSAGES.some((msg) => message.includes(msg));
+
 const open = defineModel<boolean>({ default: false });
 
 interface BackgroundMusicAction {
@@ -430,10 +442,41 @@ const logMusicStartStep = (
 const SONG_LIBRARY_RETRY_TIMEOUT_MS = 2 * 60 * 1000;
 const SONG_LIBRARY_RETRY_INTERVAL_MS = 15 * 1000;
 
+// After an auto-triggered attempt fails (song library permanently empty,
+// e.g. every song failed to download), the auto-start watcher below would
+// otherwise see musicState flip to 'music.error' and immediately fire
+// another attempt - each one waiting up to SONG_LIBRARY_RETRY_TIMEOUT_MS
+// before failing again, but with no cooldown between cycles, a persistent
+// failure retries nonstop for as long as the meeting-day auto-start window
+// stays open. Wait this long between auto-retries instead.
+const AUTO_START_ERROR_COOLDOWN_MS = SONG_LIBRARY_RETRY_TIMEOUT_MS;
+let autoStartRetryTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Schedules a single cooldown-gated auto-start retry after a failure,
+ * regardless of what triggered the failing attempt (manual or auto) - a
+ * manual click failing during the auto-start window shouldn't disable
+ * auto-recovery for the rest of the meeting day. Re-checked at fire time so
+ * it's a no-op if something else already resolved the error state.
+ */
+const scheduleAutoStartRetry = () => {
+  clearTimeout(autoStartRetryTimer);
+  autoStartRetryTimer = setTimeout(() => {
+    autoStartRetryTimer = undefined;
+    if (shouldAutoStart.value && musicState.value === 'music.error') {
+      log('🎵 Retrying auto-start after cooldown', 'backgroundMusic', 'info');
+      playMusic('auto');
+    }
+  }, AUTO_START_ERROR_COOLDOWN_MS);
+};
+
 /**
  * Initializes and plays background music
  */
 async function playMusic(reason = 'manual') {
+  clearTimeout(autoStartRetryTimer);
+  autoStartRetryTimer = undefined;
+
   musicStartTiming.value = {
     id: musicStartId.value + 1,
     reason,
@@ -609,7 +652,21 @@ async function playMusic(reason = 'manual') {
 
     const playStartedAt = performance.now();
     logMusicStartTiming('audio play requested');
-    await musicPlayer.value?.play();
+    try {
+      await musicPlayer.value?.play();
+    } catch (error) {
+      // Same benign interruption handleMusicEnded already filters below -
+      // something else (stopMusic, another playMusic call) legitimately
+      // paused/reloaded the element while this play() was still pending, so
+      // aborting quietly here is correct, not a failure to report or retry.
+      if (
+        isIgnorablePlaybackError(error instanceof Error ? error.message : '')
+      ) {
+        logMusicStartTiming('audio play interrupted (ignorable)', 'debug');
+        return;
+      }
+      throw error;
+    }
     logMusicStartStep('audio play promise resolved', playStartedAt);
     log(`🎵 Music started at ${startTime} seconds`, 'backgroundMusic', 'info');
 
@@ -622,6 +679,7 @@ async function playMusic(reason = 'manual') {
     musicState.value = 'music.error';
     logMusicStartTiming('start failed', 'warn');
     errorCatcher(error);
+    scheduleAutoStartRetry();
   }
 }
 
@@ -692,7 +750,13 @@ const handleMusicEnded = async () => {
     },
   );
   musicPlayer.value?.load();
-  musicPlayer.value?.play();
+  musicPlayer.value?.play().catch((error: Error) => {
+    if (!isIgnorablePlaybackError(error.message)) {
+      errorCatcher(error, {
+        contexts: { fn: { name: 'handleMusicEnded' } },
+      });
+    }
+  });
 };
 
 /**
@@ -793,20 +857,12 @@ useEventListener(musicPlayer, 'error', (event) => {
   logAudioEventTiming(event);
   if (event.target instanceof HTMLAudioElement) {
     musicState.value = 'music.error';
-    if (event.target.error?.message) {
-      const ignoredErrors = [
-        'removed from the document',
-        'new load request',
-        'interrupted by a call to pause',
-      ];
-
-      if (
-        !ignoredErrors.some((msg) =>
-          (event.target as HTMLAudioElement)?.error?.message?.includes(msg),
-        )
-      ) {
-        errorCatcher(event.target.error);
-      }
+    scheduleAutoStartRetry();
+    if (
+      event.target.error?.message &&
+      !isIgnorablePlaybackError(event.target.error.message)
+    ) {
+      errorCatcher(event.target.error);
     }
   }
 });
@@ -892,6 +948,13 @@ watch(
     }
     if (oldSelectedDate !== newSelectedDate) {
       musicAlreadyStoppedManually.value = false;
+      // A stuck error from a previous day shouldn't suppress auto-start
+      // forever - the auto-start watcher no longer retries on its own once
+      // in 'music.error' (see AUTO_START_ERROR_COOLDOWN_MS), so give each
+      // new day a fresh attempt.
+      if (musicState.value === 'music.error') {
+        musicState.value = '';
+      }
     }
   },
   { immediate: true },
@@ -905,7 +968,11 @@ watchImmediate(
       shouldStart &&
       state !== 'music.starting' &&
       state !== 'music.stopping' &&
-      state !== 'music.playing'
+      state !== 'music.playing' &&
+      // A failure schedules its own cooldown retry in playMusic() rather
+      // than reacting to this state change immediately - see
+      // AUTO_START_ERROR_COOLDOWN_MS.
+      state !== 'music.error'
     ) {
       log('🎵 Auto-starting background music', 'backgroundMusic', 'info');
       playMusic('auto');
@@ -964,7 +1031,10 @@ watch(popupContent, (el) => {
   popupResizeObserver.observe(el);
 });
 
-onBeforeUnmount(() => popupResizeObserver?.disconnect());
+onBeforeUnmount(() => {
+  popupResizeObserver?.disconnect();
+  clearTimeout(autoStartRetryTimer);
+});
 
 whenever(
   () => volumeData.value,

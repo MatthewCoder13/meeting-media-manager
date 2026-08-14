@@ -10,6 +10,7 @@ import type {
 import { i18n } from 'boot/i18n';
 import { getMeetingSections, standardSections } from 'src/constants/media';
 import { isCoWeek } from 'src/helpers/date';
+import { withLockRetry } from 'src/helpers/fs-retry';
 import { log } from 'src/shared/vanilla';
 import { useCurrentStateStore } from 'src/stores/current-state';
 
@@ -250,8 +251,13 @@ const parseColorToRgb = (color: string): [number, number, number] | null => {
     : [r, g, b];
 };
 
-export const getTextColor = (section?: MediaSectionWithConfig) => {
-  const bgColor = section?.config?.bgColor;
+// Gamma-corrected relative-luminance black/white contrast pick, usable for
+// any bgColor string (hex or rgb()) - not just a MediaSection's own color.
+// getTextColor() below wraps this for the section-shaped call sites; other
+// consumers needing text-on-arbitrary-color contrast (e.g. the congregation
+// switcher's hashed avatar colors) should call this directly rather than
+// re-implementing their own luminance math.
+export const getTextColorForBgColor = (bgColor?: string) => {
   if (!bgColor) return '#ffffff';
 
   const rgb = parseColorToRgb(bgColor);
@@ -260,7 +266,7 @@ export const getTextColor = (section?: MediaSectionWithConfig) => {
       contexts: {
         fn: {
           bgColor,
-          name: 'getTextColor',
+          name: 'getTextColorForBgColor',
         },
       },
     });
@@ -280,6 +286,9 @@ export const getTextColor = (section?: MediaSectionWithConfig) => {
   // Return white or black based on contrast
   return lum > 0.3 ? '#000000' : '#ffffff';
 };
+
+export const getTextColor = (section?: MediaSectionWithConfig) =>
+  getTextColorForBgColor(section?.config?.bgColor);
 
 // Mirrors the hardcoded left-bar colors in the `.media-section` SCSS rules
 // for the meeting sections that always use the same color (see app.scss).
@@ -473,18 +482,26 @@ const writeWatchedMediaSectionOrder = async (
 
   // Write to a temp file and rename into place rather than writing the
   // target directly. A rename is atomic; a multi-KB write is not, and this
-  // file commonly lives in a cloud-synced folder (OneDrive, etc.) whose
-  // background sync I/O can interleave with an in-place write and leave
-  // truncated/corrupted JSON for the next reader to trip over.
+  // file commonly lives in a cloud-synced folder (OneDrive, Dropbox, ...)
+  // whose background sync I/O can interleave with an in-place write and
+  // leave truncated/corrupted JSON for the next reader to trip over. The
+  // sync client can also hold a transient lock on the temp/target file
+  // during that same window, so both steps get the Windows lock retry.
   const tempPath = `${sectionOrderFilePath}.${Date.now()}.tmp`;
-  await writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8');
-  await rename(tempPath, sectionOrderFilePath);
+  await withLockRetry(() =>
+    writeFile(tempPath, JSON.stringify(data, null, 2), 'utf-8'),
+  );
+  await withLockRetry(() => rename(tempPath, sectionOrderFilePath));
   await hideFileOnWindows(sectionOrderFilePath);
 };
 
 export const saveWatchedMediaLayout = async (
   mediaSections: MediaSectionWithConfig[],
 ): Promise<void> => {
+  // Tracked outside the try block so the catch below can report which
+  // folder's write actually failed, instead of just the function name.
+  let sectionOrderFilePath: string | undefined;
+
   try {
     const { basename, dirname, fileUrlToPath, join } = globalThis.electronApi;
     const dataByFolder: Record<string, WatchedMediaSectionOrder> = {};
@@ -510,13 +527,18 @@ export const saveWatchedMediaLayout = async (
     });
 
     for (const [datedFolderPath, layoutData] of Object.entries(dataByFolder)) {
-      const sectionOrderFilePath = join(datedFolderPath, '.section-order.json');
+      const currentSectionOrderFilePath = join(
+        datedFolderPath,
+        '.section-order.json',
+      );
+      sectionOrderFilePath = currentSectionOrderFilePath;
 
-      await withSectionOrderLock(sectionOrderFilePath, async () => {
-        const existingData =
-          await readWatchedMediaSectionOrder(sectionOrderFilePath);
+      await withSectionOrderLock(currentSectionOrderFilePath, async () => {
+        const existingData = await readWatchedMediaSectionOrder(
+          currentSectionOrderFilePath,
+        );
 
-        await writeWatchedMediaSectionOrder(sectionOrderFilePath, {
+        await writeWatchedMediaSectionOrder(currentSectionOrderFilePath, {
           ...existingData,
           ...layoutData,
         });
@@ -527,6 +549,7 @@ export const saveWatchedMediaLayout = async (
       contexts: {
         fn: {
           name: 'saveWatchedMediaLayout',
+          sectionOrderFilePath,
         },
       },
     });

@@ -4,6 +4,15 @@
 
 Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGELOG.md su GitHub.
 
+## v26.8.0
+
+### ✨ Nuove Funzionalità
+
+- ✨ **App-Wide Redesign**: un ampio aggiornamento visivo e di interazione attraverso le finestre di dialogo, la lista dei supporti/intestazione, le impostazioni e la procedura guidata di configurazione. La procedura guidata di configurazione è ora un flusso di una domanda per schermo con una barra di avanzamento. Tutti i prompt sono stati sostituiti con una finestra di dialogo marchiata coerente, e la selezione dell'intervallo di pagine PDF (per le importazioni di pubblicazione e trascinamento) ora utilizza un selettore di griglie-miniature invece di un prompt di testo libero. Aggiunto un nuovo tour della Guida di Avvio Rapido dopo il completamento dell'Installazione Guidata. Include anche lo styling ricaricato della carta/intestazione con ombre oscure e diverse correzioni di contrasto della modalità scura (etichette di campo focalizzate, percentuali di scarico-avanzamento).
+- ✨ **Pagina delle impostazioni**: Rielaborato in un layout a due pannelli, con una nuova sezione globale di Preferenze per l'aggiornamento automatico/aggiornamento beta-commuta fuori dalla finestra di dialogo Informazioni (che ora è puramente informativa).
+- ✨ **Aggiungi più tasto multimediale**: Aggiunta un'impostazione per scegliere esattamente quali sezioni delle adunanze mostrano il pulsante scorciatoia "aggiungi più media", insieme a una impostazione per una modalità compatta (solo icone).
+- ✨ **Media List**: Gli elementi mostrano ora gli scheletri di caricamento mentre vengono aggiunti invece di apparire vuoti, i gruppi multimediali mostrano un conteggio di elementi nascosti nel loro distintivo (es. "9 elementi (2 nascosti)"), i bambini all'interno di un gruppo possono essere riordinati tramite drag-and-drop, e a larghezze della finestra molto strette gli oggetti crollano in chip compatti, porta-punta degli strumenti invece di affollare la fila.
+
 ## v26.7.7
 
 ### ✨ Nuove Funzionalità
@@ -12,14 +21,14 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v26.7.6
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - ✨ **Esclusione Video CBS**: Aggiunta un'impostazione per escludere i video di Studio Biblico di Congregazione da pubblicazioni specifiche (default per il **Camminare coraggiosamente con Dio** libro), con un selettore di pubblicazione ricercabile.
 - ✨ **Numeri di pagina del documento**: Pubblicazione Media e JWPUB importati ora mostra il numero di pagina di ogni documento (o i numeri quando ci sono più pagine) dopo il suo titolo. Questo può aiutare a trovare rapidamente i media specifici quando si conosce il numero di pagina su cui è trovato.
 
 ## v26.7.4
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - ✨ **Recupero dei media mancanti**: gli elementi multimediali il cui file locale è andato perso (ad es. eliminato dalla cancellazione automatica della cache, o rimosso manualmente) mostrano ora un pulsante di riproduzione disabilitato, una didascalia «mancante» che indica il file da cercare e una nuova azione «Individua file» per ricollegare l'elemento a un file sul disco.
 - ✨ **Avviso di compatibilità**: aggiunto un banner ignorabile che avvisa gli utenti con combinazioni di sistema operativo/architettura presto non più supportate (macOS 12 Monterey e Windows a 32 bit) di aggiornare prima che i futuri aggiornamenti dell'app richiedano un sistema più recente.
@@ -33,7 +42,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v26.6.1
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - ✨ **Anteprima dei media**: aggiunto un overlay di anteprima dei media dal vivo che può essere attivato o disattivato dalle impostazioni o dal popup di visualizzazione.
 - ✨ **Cerca media**: aggiunta una casella di ricerca rapida nell'elenco dei media che consente di trovare rapidamente i media per titolo. Per usarla, basta usare la scorciatoia da tastiera standard per la ricerca (Ctrl+F o Cmd+F).
@@ -42,7 +51,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v26.6.0
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - ✨ **Timer**: aggiunte modalità di visualizzazione analogica e lo stato del resoconto dei tempi.
 - ✨ **Profili**: aggiunte l'importazione e l'esportazione delle impostazioni del profilo nelle impostazioni Avanzate e nella Configurazione guidata.
@@ -50,13 +59,13 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v26.5.0
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - ✨ **Importazione PDF**: aggiunto un nuovo flusso di importazione PDF alla finestra Media delle pubblicazioni, che consente di importare automaticamente la versione PDF di una pubblicazione come singole immagini quando desiderato.
 
 ## v26.4.8
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - ✨ **JW Stream**: Aggiunto JW Stream alla lista dei siti web che possono essere mirrored.
 
@@ -68,7 +77,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v26.3.0
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - ✨ **Memorial Media**: Il recupero automatico dei media commemorativi è ora fuori dalla beta! L'app scaricherà automaticamente il Memorial Welcome Video e l'immagine da visualizzare durante il Memoriale, quando disponibile nella lingua configurata.
 - ✨ **Velocità di riproduzione**: Aggiunto controllo della velocità di riproduzione con indicatore visivo, e ripristino manuale. Questa funzione è visibile solo se abilitata nelle impostazioni avanzate.
@@ -140,7 +149,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v25.10.0
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - ✨ **Avvia la riproduzione in pausa**: aggiunta una nuova impostazione per consentire alla riproduzione di iniziare in pausa, utile agli operatori audio/video per preparare la loro configurazione (come avviare la condivisione su Zoom) prima che il media inizi a essere riprodotto nella finestra multimediale.
 - ✨ **Notifiche di aggiornamento**: gli utenti verranno ora avvisati degli aggiornamenti tramite un banner nell'app, che permetterà anche di installare gli aggiornamenti immediatamente, invece di aspettare il successivo riavvio dell'app.
@@ -148,7 +157,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v25.9.1
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - ✨ **Finestra multimediale sempre in primo piano e comportamento a schermo intero**: corretto e migliorato il comportamento sempre-in-primo-piano della finestra multimediale, adattandolo dinamicamente in base allo stato a schermo intero.
 - ✨ **Impostazione del formato di visualizzazione della data**: aggiunta un'impostazione utente per configurare un formato di visualizzazione della data.
@@ -181,13 +190,13 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## v25.7.0
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - Nessuna nuova funzionalità per questa versione!
 
 ## 25.6.0
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - ✨ **Impostazione di connessione a consumo**: Aggiunta una nuova impostazione per ridurre l'utilizzo della banda di download sulle connessioni a consumo.
 - ✨ **Migliorata la gestione dei media in streaming**: Migliore supporto per i media in streaming, riducendo i problemi legati alla latenza.
@@ -208,7 +217,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## 25.3.1
 
-### ✨ Nuove Funzionalità
+### ✨ Nuove funzionalità
 
 - 🌏 **Nuova lingua: coreano**: aggiunge il supporto per la lingua coreana, ampliando l'accessibilità per più utenti.
 
@@ -230,7 +239,7 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## 25.2.0
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
 - 🌍 **Use System Locale by Default**: Rilevare e utilizzare automaticamente il locale del sistema per un'esperienza più personalizzata.
 - 🏷️ **Tag Support for Exported Media**: Aggiungi tag di metadati ai file multimediali esportati per una migliore organizzazione.
@@ -249,24 +258,24 @@ Per l'elenco completo delle modifiche tra le versioni, consultare il file CHANGE
 
 ## 24.11.0
 
-### ✨ Nuove funzionalità
+### ✨ Nuove Funzionalità
 
-- **funzione**: La presentazione del sito web è ora supportata su macOS 🚀
-- **funzione**: Introduce le scorciatoie da tastiera per arrestare, mettere in pausa e riprendere la riproduzione multimediale 🚀
-- **funzione**: Aggiunto il supporto per impostare l'indirizzo web da cui i media dovrebbero essere scaricati 🚀
-- **caratteristica**: Aggiunta la scena-selettore istantaneo di OBS Studio e la funzionalità di selezione della scena revisionata nelle impostazioni
-- **funzione**: sito web di documentazione esteso per supportare più lingue
+- 🖥️ **Presentazione del sito web su macOS**: La presentazione del sito web è ora supportata su macOS 🚀
+- ⌨️ **funzione**: Introduce le scorciatoie da tastiera per arrestare, mettere in pausa e riprendere la riproduzione multimediale 🚀
+- 🌐 **funzione**: Aggiunto il supporto per impostare l'indirizzo web da cui i media dovrebbero essere scaricati 🚀
+- 🎬 **caratteristica**: Aggiunta la scena-selettore istantaneo di OBS Studio e la funzionalità di selezione della scena revisionata nelle impostazioni
+- 📖 **funzione**: sito web di documentazione esteso per supportare più lingue
 
 ## 24.10.10
 
 ### ✨ Nuove Funzionalità
 
-- **nuovo**: Aggiunte scorciatoie da tastiera per navigare all'elemento multimediale successivo/precedente
-- **nuovo**: Aggiunto un menu con il tasto destro del mouse agli elementi multimediali per nascondere gli elementi multimediali e rinominarli
-- **nuovo**: I tempi video tagliati sono ora rispettati nelle playlist JWL importate
+- ⌨️ **nuovo**: Aggiunte scorciatoie da tastiera per navigare all'elemento multimediale successivo/precedente
+- 🖱️ **nuovo**: Aggiunto un menu con il tasto destro del mouse agli elementi multimediali per nascondere gli elementi multimediali e rinominarli
+- ✂️ **nuovo**: I tempi video tagliati sono ora rispettati nelle playlist JWL importate
 
 ## 24.10.9
 
 ### ✨ Nuove Funzionalità
 
-- **funzione**: Aggiunta un'opzione per eliminare tutti i file multimediali aggiuntivi per il giorno attualmente selezionato
+- 🗑️ **funzione**: Aggiunta un'opzione per eliminare tutti i file multimediali aggiuntivi per il giorno attualmente selezionato

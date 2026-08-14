@@ -4,7 +4,12 @@
       class="bg-secondary-contrast large-overlay q-px-none flex"
       style="flex-flow: column"
     >
-      <div class="row q-px-md q-pt-lg text-h6">
+      <div
+        class="row q-px-md q-pt-lg text-bigger text-semibold text-primary items-center"
+      >
+        <div class="icon-chip q-mr-sm">
+          <q-icon name="mmm-jwlplaylist" size="xs" />
+        </div>
         <div class="col">
           {{ t('jw-playlist-import') }}
         </div>
@@ -170,19 +175,17 @@
         </div>
         <div class="col-shrink q-gutter-x-sm">
           <q-btn
-            v-if="selectedItems.length"
-            color="primary"
-            :label="t('add') + ` (${selectedItems.length})`"
-            :loading="isProcessing"
-            @click="addSelectedItems"
-          />
-          <q-btn
-            v-else
-            color="negative"
             :disable="isProcessing"
             flat
             :label="t('cancel')"
             @click="handleCancel"
+          />
+          <q-btn
+            v-if="selectedItems.length"
+            color="primary"
+            :label="t('add-count', { count: selectedItems.length })"
+            :loading="isProcessing"
+            @click="addSelectedItems"
           />
         </div>
       </div>
@@ -731,13 +734,33 @@ const addSelectedItems = async () => {
 
     isProcessing.value = true;
 
-    // Process all items in playlist order, keeping them all in one array
+    // Process all items in playlist order, keeping them all in one array.
+    // Each item gets its own try/catch: one item's network/file failure
+    // (e.g. a video that fails to download) shouldn't discard every other
+    // item that already processed successfully - the whole batch used to
+    // abort silently on the first failure.
     const processedMediaItems: DialogImportPayload['items'] = [];
 
     for (const [idx, item] of selectedPlaylistItems.entries()) {
-      const result = await processSingleItem(item, idx, outputPath);
-      if (result?.mappedItems?.length) {
-        processedMediaItems.push(...result.mappedItems);
+      try {
+        const result = await processSingleItem(item, idx, outputPath);
+        if (result?.mappedItems?.length) {
+          processedMediaItems.push(...result.mappedItems);
+        }
+      } catch (error) {
+        createTemporaryNotification({
+          caption: getItemLabel(idx, item),
+          message: t('fileProcessError'),
+          type: 'negative',
+        });
+        errorCatcher(error, {
+          contexts: {
+            fn: {
+              args: { item },
+              name: 'addSelectedItems (processSingleItem)',
+            },
+          },
+        });
       }
     }
 

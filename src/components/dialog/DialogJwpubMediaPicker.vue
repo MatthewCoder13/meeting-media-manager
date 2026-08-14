@@ -4,7 +4,12 @@
       class="bg-secondary-contrast large-overlay q-px-none flex"
       style="flex-flow: column"
     >
-      <div class="row q-px-md q-pt-lg text-h6">
+      <div
+        class="row q-px-md q-pt-lg text-bigger text-semibold text-primary items-center"
+      >
+        <div class="icon-chip q-mr-sm">
+          <q-icon name="mmm-jwpub" size="xs" />
+        </div>
         <div class="col">
           {{ publicationTitle || t('select-media-items') }}
         </div>
@@ -62,12 +67,10 @@
                   v-for="(item, index) in mediaItems"
                   :key="item.MultimediaId"
                   clickable
-                  :disable="isProcessing"
                   @click="toggleItem(index)"
                 >
                   <q-item-section avatar>
                     <q-checkbox
-                      :disable="isProcessing"
                       :model-value="selectedItems.includes(index)"
                       @update:model-value="toggleItem(index)"
                     />
@@ -116,7 +119,6 @@
           <q-btn
             v-if="selectedItems.length < mediaItems.length"
             color="primary"
-            :disable="isProcessing"
             flat
             :label="t('select-all')"
             @click="selectAll"
@@ -127,25 +129,17 @@
               mediaItems.length > 0
             "
             color="primary"
-            :disable="isProcessing"
             flat
             :label="t('deselect-all')"
             @click="deselectAll"
           />
         </div>
         <div class="col-shrink q-gutter-x-sm">
-          <q-btn
-            color="negative"
-            :disable="isProcessing"
-            flat
-            :label="t('cancel')"
-            @click="handleCancel"
-          />
+          <q-btn flat :label="t('cancel')" @click="handleCancel" />
           <q-btn
             v-if="selectedItems.length"
             color="primary"
-            :label="t('add') + ` (${selectedItems.length})`"
-            :loading="isProcessing"
+            :label="t('add-count', { count: selectedItems.length })"
             @click="addSelectedItems"
           />
         </div>
@@ -168,6 +162,7 @@ import {
   getJwLangCode,
   resolveMultimediaPreviewPath,
 } from 'src/helpers/jw-media';
+import { withPendingSectionImport } from 'src/helpers/pending-section-imports';
 import { log } from 'src/shared/vanilla';
 import {
   addFullFilePathToMultimediaItem,
@@ -202,7 +197,6 @@ const dialogValue = computed({
 });
 
 const loading = ref<boolean>(false);
-const isProcessing = ref<boolean>(false);
 const mediaItems = ref<(MultimediaItem & { ResolvedPreviewPath?: string })[]>(
   [],
 );
@@ -322,35 +316,37 @@ const getMediaAlt = (item: MultimediaItem) => {
   return getMediaLabel(item);
 };
 
-const addSelectedItems = async () => {
-  try {
-    if (!props.dbPath || !props.document) return;
+const addSelectedItems = () => {
+  const { dbPath, document } = props;
+  if (!dbPath || !document || !selectedItems.value.length) return;
 
-    isProcessing.value = true;
-    if (!selectedItems.value.length) return;
+  const selectedMultimediaIds = selectedItems.value
+    .map((index) => mediaItems.value[index]?.MultimediaId)
+    .filter((id): id is number => id !== undefined);
 
-    const selectedMultimediaIds = selectedItems.value
-      .map((index) => mediaItems.value[index]?.MultimediaId)
-      .filter((id): id is number => id !== undefined);
+  log('🎯 Selected multimedia IDs:', 'jwpub', 'log', selectedMultimediaIds);
 
-    log('🎯 Selected multimedia IDs:', 'jwpub', 'log', selectedMultimediaIds);
+  // Fire-and-forget: addJwpubDocumentMediaToFiles already catches and
+  // swallows its own errors, so awaiting it here bought the user nothing
+  // but a spinner. Closing the dialog immediately and letting the
+  // section's skeleton placeholder (from withPendingSectionImport) cover
+  // the wait matches every other "add media" dialog's behavior.
+  void withPendingSectionImport(
+    props.section || 'imported-media',
+    selectedMultimediaIds.length,
+    () =>
+      addJwpubDocumentMediaToFiles(
+        dbPath,
+        document,
+        props.section,
+        undefined, // pubFolder
+        undefined, // meetingDate
+        selectedMultimediaIds,
+      ),
+  );
 
-    await addJwpubDocumentMediaToFiles(
-      props.dbPath,
-      props.document,
-      props.section,
-      undefined, // pubFolder
-      undefined, // meetingDate
-      selectedMultimediaIds,
-    );
-
-    dialogValue.value = false;
-    emit('ok');
-  } catch (error) {
-    errorCatcher(error);
-  } finally {
-    isProcessing.value = false;
-  }
+  dialogValue.value = false;
+  emit('ok');
 };
 
 const handleCancel = () => {

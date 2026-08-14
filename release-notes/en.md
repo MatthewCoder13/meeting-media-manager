@@ -4,6 +4,15 @@
 
 For the full list of changes between versions, see our CHANGELOG.md file on GitHub.
 
+## v26.8.0
+
+### ✨ New Features
+
+- ✨ **App-Wide Redesign**: A broad visual and interaction refresh across dialogs, the media list/header, Settings, and the Setup Wizard. The Setup Wizard is now a one-question-per-screen flow with a progress bar. All prompts were replaced with a consistent branded dialog, and PDF page-range selection (for publication and drag-and-drop imports) now uses a thumbnail-grid picker instead of a free-text prompt. Added a new Quick Start Guide tour after the Setup Wizard completes. Also includes refreshed card/header styling with dark-mode-aware shadows and several dark-mode contrast fixes (focused field labels, download-progress percentages).
+- ✨ **Settings Page**: Reworked into a two-pane layout, with a new global Preferences section for auto-update/beta-update toggles moved out of the About dialog (which is now purely informational).
+- ✨ **Add More Media Button**: Added a setting to choose exactly which meeting sections show the "add more media" shortcut button, along with a setting for a compact (icon-only) mode.
+- ✨ **Media List**: Items now show loading skeletons while being added instead of appearing empty, media groups show a hidden-item count in their badge (e.g. "9 items (2 hidden)"), children within a group can be reordered via drag-and-drop, and at very narrow window widths items collapse into compact, tooltip-carrying chips instead of crowding the row.
+
 ## v26.7.7
 
 ### ✨ New Features
@@ -251,22 +260,22 @@ For the full list of changes between versions, see our CHANGELOG.md file on GitH
 
 ### ✨ New Features
 
-- **feat**: Presenting the website is now supported on macOS 🚀
-- **feat**: Introduced keyboard shortcuts for stopping, pausing, and resuming media playback 🚀
-- **feat**: Added support for setting the web address from which media should be downloaded 🚀
-- **feat**: Added OBS Studio instant scene picker and overhauled scene picker functionality in settings
-- **feat**: Expanded documentation website to support more languages
+- 🖥️ **Website Presentation on macOS**: Presenting the website is now supported on macOS 🚀
+- ⌨️ **Playback Keyboard Shortcuts**: Introduced keyboard shortcuts for stopping, pausing, and resuming media playback 🚀
+- 🌐 **Custom Media Download Address**: Added support for setting the web address from which media should be downloaded 🚀
+- 🎬 **OBS Instant Scene Picker**: Added OBS Studio instant scene picker and overhauled scene picker functionality in settings
+- 📖 **More Documentation Languages**: Expanded documentation website to support more languages
 
 ## 24.10.10
 
 ### ✨ New Features
 
-- **new**: Added keyboard shortcuts to navigate to the next/previous media item
-- **new**: Added a right-click menu to media items to hide media items and rename them
-- **new**: Trimmed video times are now respected in imported JWL playlists
+- ⌨️ **Media Navigation Shortcuts**: Added keyboard shortcuts to navigate to the next/previous media item
+- 🖱️ **Media Item Right-Click Menu**: Added a right-click menu to media items to hide media items and rename them
+- ✂️ **Trimmed JWL Playlist Import**: Trimmed video times are now respected in imported JWL playlists
 
 ## 24.10.9
 
 ### ✨ New Features
 
-- **feat**: Added an option to delete all extra media files for the currently selected day
+- 🗑️ **Delete Extra Media for a Day**: Added an option to delete all extra media files for the currently selected day

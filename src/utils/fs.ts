@@ -391,6 +391,12 @@ export const toggleAutoUpdates = async (enable: boolean) => {
     } else {
       await ensureFile(await getUpdatesDisabledPath());
     }
+    // Let any listener (the header's "updates disabled" badge, the
+    // "updates disabled" startup reminder, ...) know the setting changed,
+    // wherever the toggle was flipped from.
+    globalThis.dispatchEvent(
+      new CustomEvent<boolean>('autoUpdatesToggled', { detail: enable }),
+    );
   } catch (error) {
     errorCatcher(error, { contexts: { fn: { name: 'enableUpdates' } } });
   }
@@ -429,8 +435,10 @@ const lastVersionPath = (congId: string) =>
  * Verifies whether a new version has been installed.
  */
 export const wasUpdateInstalled = async (congId: string, newCong = false) => {
+  let lastVersionFile: string | undefined;
+
   try {
-    const lastVersionFile = await lastVersionPath(congId);
+    lastVersionFile = await lastVersionPath(congId);
     await ensureDir(dirname(lastVersionFile));
 
     if (newCong) {
@@ -451,7 +459,16 @@ export const wasUpdateInstalled = async (congId: string, newCong = false) => {
       return true;
     }
   } catch (error) {
-    errorCatcher(error, { contexts: { fn: { name: 'wasUpdateInstalled' } } });
+    errorCatcher(error, {
+      contexts: {
+        fn: {
+          congId,
+          lastVersionFile,
+          name: 'wasUpdateInstalled',
+          newCong,
+        },
+      },
+    });
     return false;
   }
 };
